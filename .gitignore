@@ -1,0 +1,13 @@
+server/keys/
+server/.host
+server/.paircode
+server/.pairresult
+server/apps_hidden.json
+server/.home_watch_off
+__pycache__/
+*.pyc
+.DS_Store
+server/.auth.json
+server/.design
+server/.youtube_last.json
+server/keys/https/

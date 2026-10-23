@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console</title>
+<style>
+@font-face { font-family: Plex; src: url(fonts/IBMPlexMono-400.woff2) format("woff2"); font-weight: 400; }
+@font-face { font-family: Plex; src: url(fonts/IBMPlexMono-500.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: Plex; src: url(fonts/IBMPlexMono-600.woff2) format("woff2"); font-weight: 600; }
+:root {
+  --bg: #0a0a0b; --panel: #0e0e0f; --line: #2a2a2c; --line-2: #3a3a3d; --tick: #d9d9d9;
+  --text: #e4e4e4; --muted: #8b8b8f; --dim: #55555a;
+  --orange: #ff6a1f; --green: #3ddc84; --green-bg: #1f3a24; --green-fg: #9be89b;
+  --red: #ff4d4d; --amber: #ffb340; --blue-bg: #1b2560; --blue-line: #3d55c8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #050506; overflow: hidden; }
+body { font: 400 16px/1.35 Plex, Menlo, monospace; color: var(--text); outline: none; -webkit-font-smoothing: antialiased; }
+#stage { width: 1920px; height: 1080px; transform-origin: 0 0; position: absolute; top: 0; left: 0; background: var(--bg); }
+.mute { color: var(--muted); }
+.dim { color: var(--dim); }
+.up { text-transform: uppercase; }
+svg { stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* panels with corner ticks, like the reference */
+.panel { position: absolute; border: 1px solid var(--line); background: var(--panel); }
+.panel > .tk { position: absolute; width: 6px; height: 6px; background: var(--tick); }
+.tk.a { top: -3px; left: -3px; } .tk.b { top: -3px; right: -3px; } .tk.c { bottom: -3px; left: -3px; } .tk.d { bottom: -3px; right: -3px; }
+.ptitle { display: flex; align-items: center; height: 26px; font-size: 19px; letter-spacing: .04em; text-transform: uppercase; }
+.ptitle:before { content: ""; width: 3px; height: 24px; background: var(--orange); margin-right: 12px; }
+.ptitle .r { margin-left: auto; font-size: 15px; letter-spacing: 0; text-transform: none; }
+
+.chip { display: inline-block; padding: 2px 8px; font-size: 14px; line-height: 20px; vertical-align: middle; }
+.chip.g { background: var(--green-bg); color: var(--green-fg); }
+.chip.gray { background: #3a3a3d; color: #e8e8e8; }
+.chip.red { border: 1px solid var(--red); color: var(--red); background: rgba(255,77,77,.08); padding: 1px 8px; }
+
+/* focus: everything focusable gets the same treatment, inverted brackets */
+.f { position: relative; transition: background-color .12s ease-out, color .12s ease-out, box-shadow .12s ease-out; }
+.f.on { box-shadow: 0 0 0 1px var(--tick); background-color: #1a1a1c; }
+
+/* ---------- rail ---------- */
+.rail { position: absolute; left: 20px; top: 20px; bottom: 20px; width: 64px; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; }
+.rail .logo { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; margin: 8px 0 26px; color: var(--orange); }
+.rail .logo svg { width: 24px; height: 24px; }
+.rail .ico { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; color: #c9c9cc; }
+.rail .ico svg { width: 22px; height: 22px; }
+.rail .ico.cur { color: var(--orange); }
+.rail .foot { margin-top: auto; margin-bottom: 8px; font-size: 15px; color: var(--muted); }
+
+/* ---------- header ---------- */
+.head { left: 100px; top: 20px; width: 1800px; height: 100px; }
+.head .r1, .head .r2 { position: absolute; left: 22px; right: 22px; display: flex; align-items: center; }
+.head .r1 { top: 14px; height: 34px; }
+.head .r2 { top: 56px; height: 34px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 14px; color: var(--muted); }
+.head .r1 .t { font-size: 22px; letter-spacing: .04em; margin-right: 18px; }
+.head .r1 .sync { margin-left: auto; font-size: 15px; color: var(--muted); }
+.head .r1 .sync b { color: var(--text); font-weight: 400; }
+.head .sep { margin: 0 14px; color: var(--muted); }
+.head .r2 .right { margin-left: auto; }
+.head .r2 .chip { font-size: 13px; line-height: 18px; margin-left: 6px; }
+
+/* ---------- metrics ---------- */
+.metrics { left: 100px; top: 136px; width: 520px; height: 168px; padding: 18px 20px; }
+.boxes { display: flex; margin-top: 16px; }
+.box { width: 148px; height: 86px; margin-right: 18px; position: relative; text-align: center; padding-top: 10px; border: 1px solid transparent; }
+.box:last-child { margin-right: 0; }
+.box:before, .box:after { content: ""; position: absolute; top: -1px; bottom: -1px; width: 8px; border: 1px solid var(--line-2); }
+.box:before { left: -1px; border-right: 0; } .box:after { right: -1px; border-left: 0; }
+.box .n { font-size: 34px; font-weight: 600; line-height: 1.1; }
+.box .l { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+.activity { left: 636px; top: 136px; width: 554px; height: 168px; padding: 18px 20px; }
+.meters { display: flex; margin-top: 16px; border: 1px solid var(--line-2); padding: 12px 14px; height: 86px; }
+.meter { flex: 1; }
+.meter .l { font-size: 14px; color: var(--muted); }
+.meter .v { display: flex; align-items: center; margin-top: 10px; font-size: 20px; font-weight: 500; }
+.meter .v small { font-size: 13px; color: var(--muted); margin-left: 2px; font-weight: 400; }
+.bars { display: flex; margin-right: 10px; height: 20px; }
+.bars i { width: 3px; height: 20px; margin-right: 2px; background: #2c3b30; }
+.bars i.on { background: var(--green); }
+.bars i.tail { width: 4px; background: #e8e8e8; }
+
+/* ---------- table ---------- */
+.table { left: 100px; top: 320px; width: 1090px; height: 452px; padding: 18px 20px; overflow: hidden; }
+.table .ptitle .r .chip { margin-left: 10px; }
+.sel { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; background: var(--blue-bg); border: 1px solid var(--blue-line); color: #dfe5ff; font-size: 14px; margin-left: 10px; }
+.sel svg { width: 14px; height: 14px; margin-left: 10px; }
+.cols, .row { display: grid; grid-template-columns: 24px 330px 230px 190px 1fr; align-items: center; }
+.cols { margin-top: 16px; height: 30px; font-size: 13px; color: var(--muted); text-transform: uppercase; padding: 0 12px; border-bottom: 1px solid var(--line-2); }
+.rows { margin-top: 4px; }
+.row { height: 42px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 16px; }
+.row .car { color: var(--muted); font-size: 14px; }
+.row .nm { display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
+.row .nm img, .row .nm .mono { width: 22px; height: 22px; border-radius: 5px; margin-right: 12px; flex: none; filter: grayscale(1) contrast(1.1); }
+.row .st i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; vertical-align: 1px; }
+.row.on { box-shadow: inset 3px 0 0 var(--orange), 0 0 0 1px var(--line-2); background-color: #151517; }
+.row.on .nm img, .row.on .nm .mono { filter: none; }
+.mono { display: inline-flex; align-items: center; justify-content: center; background: #2a2a2d; color: #ddd; font-size: 10px; }
+.expand { border: 1px solid var(--line-2); border-top: 0; padding: 8px 16px 8px; font-size: 14px; display: none; }
+.expand.open { display: block; }
+.expand .meta { display: flex; color: var(--muted); }
+.expand .meta span { margin-right: 36px; }
+.expand .meta b { color: var(--text); font-weight: 400; }
+.expand .log { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.expand .log .h { display: flex; align-items: center; margin-bottom: 4px; }
+.expand .log .h svg { width: 15px; height: 15px; margin-right: 8px; color: var(--muted); }
+.expand .log div.l { color: #c9c9cc; line-height: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.expand .log .l .tm { color: var(--muted); }
+.ok { color: var(--green); } .bad { color: var(--red); } .warn { color: var(--amber); }
+.viewall { display: block; width: 180px; margin: 8px auto 0; text-align: center; height: 34px; line-height: 34px; font-size: 16px; }
+
+/* ---------- detail ---------- */
+.detail { left: 1206px; top: 136px; width: 694px; height: 488px; padding: 18px 20px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-row-gap: 20px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.fields .k { font-size: 13px; color: var(--muted); text-transform: uppercase; }
+.fields .v { font-size: 16px; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; text-transform: uppercase; }
+.risk { display: flex; align-items: center; }
+.risk i { display: inline-block; width: 60px; height: 14px; margin-right: 10px; background: repeating-linear-gradient(90deg, #444 0 2px, transparent 2px 4px); position: relative; }
+.risk i b { position: absolute; left: 0; top: 0; bottom: 0; background: #f2f2f2; }
+.assess { margin-top: 22px; border-left: 3px solid #d0d0d0; padding: 2px 0 2px 14px; font-size: 14px; line-height: 22px; color: #bdbdc1; }
+.assess .l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acts { display: flex; margin-top: 22px; }
+.btn { flex: 1; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; }
+.btn.cancel { background: #3b3b3e; color: #eee; border: 1px solid #555; margin-right: 26px; }
+.btn.open { background: #f4f4f4; color: #0b0b0b; }
+.btn.on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--orange); }
+.btn.cancel.on { background: #4a4a4e; }
+.btn.open.on { background: #fff; }
+
+/* ---------- assistant ---------- */
+.assist { left: 1206px; top: 640px; width: 694px; height: 420px; padding: 18px 20px 0; }
+.say { margin-top: 20px; border-left: 3px solid #d0d0d0; padding: 2px 0 2px 14px; font-size: 15px; line-height: 23px; color: #c9c9cc; }
+.ask { text-align: right; margin-top: 16px; font-size: 15px; color: #e4e4e4; }
+.ask i { display: inline-block; width: 4px; height: 20px; background: #3d5bff; margin-left: 12px; vertical-align: -4px; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.cmds { margin-top: 14px; border-left: 3px solid #d0d0d0; padding-left: 14px; }
+.cmd { font-size: 15px; height: 30px; line-height: 30px; padding: 0 8px; margin-left: -8px; color: #d8d8d8; white-space: nowrap; }
+.cmd .k { color: var(--muted); }
+.cmd.on { box-shadow: none; background-color: #1d1d20; color: #fff; }
+.cmd.on:before { content: "> "; color: var(--orange); }
+.prompt { position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: #232325; display: flex; align-items: center; padding: 0 20px; font-size: 15px; color: #cfcfd2; }
+.prompt:before { content: ""; width: 3px; height: 22px; background: #3d5bff; margin-right: 12px; }
+
+/* ---------- live feed ---------- */
+.feed { left: 100px; top: 788px; width: 540px; height: 272px; padding: 14px 18px; }
+.feed .t1 { display: flex; align-items: flex-start; font-size: 14px; }
+.feed .t1 .live { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ff2d2d; margin-right: 10px; vertical-align: -1px; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.feed .t1 .sel { margin-left: auto; background: #2b2b2e; border-color: #555; color: #ddd; }
+.feed .t2 { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.feed .t2 b { color: var(--text); font-weight: 500; }
+.shot { position: absolute; left: 18px; right: 18px; top: 74px; bottom: 14px; overflow: hidden; background: #111; }
+.shot .ph { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; filter: grayscale(1) contrast(1.15) brightness(.85); transition: opacity .8s ease; }
+.shot .scan { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); }
+.shot .crn { position: absolute; width: 14px; height: 14px; border-color: #fff; border-style: solid; }
+.crn.a { left: 6px; top: 6px; border-width: 2px 0 0 2px; } .crn.b { right: 6px; top: 6px; border-width: 2px 2px 0 0; }
+.crn.c { left: 6px; bottom: 6px; border-width: 0 0 2px 2px; } .crn.d { right: 6px; bottom: 6px; border-width: 0 2px 2px 0; }
+.shot .tag { position: absolute; left: 46%; top: 22%; padding: 6px 8px; background: rgba(20,20,22,.72); border: 1px solid rgba(255,255,255,.35); font-size: 12px; line-height: 16px; color: #eee; text-transform: uppercase; max-width: 230px; }
+.shot .box2 { position: absolute; left: 36%; top: 36%; width: 120px; height: 84px; border: 1px solid rgba(255,255,255,.75); }
+.shot .box2:after { content: ""; position: absolute; right: -5px; bottom: 18px; width: 9px; height: 9px; background: #ff2d2d; }
+.shot .hair { position: absolute; left: 60%; top: 62%; width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+.shot .hair:before, .shot .hair:after { content: ""; position: absolute; background: rgba(255,255,255,.8); }
+.shot .hair:before { left: 14px; top: 0; width: 2px; height: 30px; } .shot .hair:after { top: 14px; left: 0; height: 2px; width: 30px; }
+
+/* ---------- inputs map ---------- */
+.map { left: 656px; top: 788px; width: 534px; height: 272px; padding: 14px 18px; overflow: hidden; background-color: #0c0c0d; }
+.map .dots { position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  background-image: radial-gradient(rgba(220,220,225,.55) 1.1px, transparent 1.5px); background-size: 9px 9px;
+  -webkit-mask-image: radial-gradient(ellipse 72% 62% at 46% 58%, #000 30%, transparent 75%); }
+.map .t1 { position: relative; display: flex; font-size: 14px; }
+.map .t1 .r { margin-left: auto; }
+.map .foot { position: absolute; right: 18px; bottom: 12px; font-size: 13px; text-transform: uppercase; }
+.map .foot b { color: var(--red); font-weight: 500; }
+.node { position: absolute; }
+.node .lb { position: absolute; left: 0; bottom: 26px; transform: translateX(-50%); padding: 3px 8px; font-size: 13px; white-space: nowrap; background: #6b4a12; border: 1px solid #c88a22; color: #ffd690; }
+.node.live .lb { background: #1f3a24; border-color: #3ddc84; color: #b8f3c8; }
+.node.idle .lb { background: #3a3a3d; border-color: #6a6a6e; color: #ddd; }
+.node .lb:after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 12px; background: currentColor; opacity: .7; }
+.node .tg { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #f2f2f2; }
+.node .tg:before, .node .tg:after { content: ""; position: absolute; background: #f2f2f2; }
+.node .tg:before { left: 6px; top: -5px; width: 2px; height: 24px; } .node .tg:after { top: 6px; left: -5px; height: 2px; width: 24px; }
+.node.live .tg { border-color: var(--green); animation: pulse 1.6s ease-in-out infinite; }
+.node.on { box-shadow: none; background: transparent; }
+.node.on .lb { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--orange); }
+
+/* ---------- all apps overlay ---------- */
+#all { left: 96px; top: 132px; width: 1098px; height: 932px; box-shadow: 0 0 0 4px var(--bg); padding: 18px 20px; display: none; z-index: 5; background: #0d0d0e; }
+#all.open { display: block; }
+#all .grid { position: absolute; left: 20px; right: 20px; top: 70px; bottom: 18px; overflow: hidden; }
+#all .inner { display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 10px; transition: transform .2s ease-out; }
+.tile { height: 64px; border: 1px solid var(--line); display: flex; align-items: center; padding: 0 14px; font-size: 15px; white-space: nowrap; overflow: hidden; }
+.tile img, .tile .mono { width: 30px; height: 30px; border-radius: 7px; margin-right: 12px; flex: none; filter: grayscale(1); }
+.tile .ix { color: var(--dim); margin-right: 12px; font-size: 13px; flex: none; }
+.tile span.nm { overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+.tile.on { box-shadow: inset 3px 0 0 var(--orange), 0 0 0 1px var(--tick); }
+.tile.on img, .tile.on .mono { filter: none; }
+
+#toast { position: absolute; left: 50%; top: 132px; transform: translateX(-50%); padding: 8px 16px; background: #141416; border: 1px solid var(--line-2); font-size: 15px; text-transform: uppercase; opacity: 0; transition: opacity .15s; z-index: 9; }
+#toast.show { opacity: 1; }
+#toast.err { color: var(--red); border-color: var(--red); }
+</style>
+</head>
+<body tabindex="-1">
+<div id="stage">
+
+  <div class="rail">
+    <div class="logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/></svg></div>
+    <div class="ico f cur" data-act="home"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12"/><path d="M18 6v12M21 6v12"/></svg></div>
+    <div class="ico f" data-act="all"><svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/><circle cx="12" cy="12" r="3"/></svg></div>
+    <div class="ico f" data-act="inputs"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg></div>
+    <div class="ico f" data-act="next"><svg viewBox="0 0 24 24"><path d="M5 20V12M10 20V6M15 20v-9M20 20V9M3 20h19"/></svg></div>
+    <div class="ico f" data-act="mute"><svg viewBox="0 0 24 24"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg></div>
+    <div class="ico f" data-act="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></svg></div>
+    <div class="foot" id="rail-vol">--</div>
+  </div>
+
+  <div class="panel head"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="r1"><span class="t">HOME CONTROL INTERFACE</span><span class="chip red">[LIVING ROOM]</span>
+      <span class="sync">Last Sync: <b id="sync">----</b></span></div>
+    <div class="r2">Device: <span class="chip gray">HISENSE VIDAA</span><span class="sep">|</span>Link: <span class="chip gray">TV</span>
+      <span class="right">System Status: <span class="chip g" id="st-link">ONLINE</span><span class="sep">|</span>On Screen: <span class="chip g" id="st-now">LAUNCHER</span></span></div>
+  </div>
+
+  <div class="panel metrics"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="ptitle">Global Device Metrics</div>
+    <div class="boxes">
+      <div class="box"><div class="n" id="m-apps">--</div><div class="l">Apps</div></div>
+      <div class="box"><div class="n" id="m-live">--</div><div class="l">Inputs Live</div></div>
+      <div class="box"><div class="n" id="m-vol">--</div><div class="l">Volume</div></div>
+    </div>
+  </div>
+
+  <div class="panel activity"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="ptitle">Session Activity</div>
+    <div class="meters">
+      <div class="meter"><div class="l">Volume Level</div><div class="v"><span class="bars" id="b-vol"></span><span id="v-vol">--</span><small>/100</small></div></div>
+      <div class="meter"><div class="l">Inputs Online</div><div class="v"><span class="bars" id="b-in"></span><span id="v-in">--</span></div></div>
+      <div class="meter"><div class="l">Link Uptime</div><div class="v"><span class="bars" id="b-up"></span><span id="v-up">--</span></div></div>
+    </div>
+  </div>
+
+  <div class="panel table"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="ptitle">App Table<span class="r"><span class="sel f" data-act="inputs">Inputs<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="sel f" data-act="all">All Apps<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></span></div>
+    <div class="cols"><span></span><span>App Name</span><span>Status</span><span>Channel</span><span>Last Opened</span></div>
+    <div class="rows" id="rows"></div>
+    <div class="viewall f" data-act="all">View All &gt;</div>
+  </div>
+
+  <div class="panel detail"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="ptitle">Launch Requires Approval<span class="r f" data-act="all" style="padding:2px 6px">View All &gt;</span></div>
+    <div class="fields">
+      <div><div class="k">App Name</div><div class="v" id="d-name">--</div></div>
+      <div><div class="k">Slot</div><div class="v" id="d-slot">--</div></div>
+      <div><div class="k">Requested By</div><div class="v">Remote</div></div>
+      <div><div class="k">Status</div><div class="v" id="d-status">--</div></div>
+      <div><div class="k">Region</div><div class="v">Living Room</div></div>
+      <div><div class="k">Last Opened</div><div class="v" id="d-last">--</div></div>
+      <div><div class="k">Usage</div><div class="v risk"><i><b id="d-bar" style="width:0"></b></i><span id="d-usage">LOW</span></div></div>
+      <div><div class="k">Opens</div><div class="v" id="d-count">0</div></div>
+      <div><div class="k">Volume</div><div class="v" id="d-vol">--</div></div>
+    </div>
+    <div class="assess" id="d-assess"></div>
+    <div class="acts"><div class="btn cancel f" data-act="cancel">Cancel</div><div class="btn open f" data-act="open">Open</div></div>
+  </div>
+
+  <div class="panel assist"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="ptitle">Assistant Panel</div>
+    <div class="say" id="say"></div>
+    <div class="ask">run a command<i></i></div>
+    <div class="cmds">
+      <div class="cmd f" data-act="all">- Show all apps <span class="k">(<span id="c-apps">--</span>)</span></div>
+      <div class="cmd f" data-act="inputs">- Jump to inputs <span class="k">(<span id="c-in">--</span> live)</span></div>
+      <div class="cmd f" data-act="mute">- Toggle mute</div>
+      <div class="cmd f" data-act="next">- Cycle live feed</div>
+      <div class="cmd f" data-act="settings">- Open TV settings</div>
+    </div>
+    <div class="prompt" id="prompt">Ready when you are...</div>
+  </div>
+
+  <div class="panel feed"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="t1"><div><span class="live"></span><span id="f-path">LIVE:_//WALL//01</span></div><span class="sel f" data-act="next">Switch Cam<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+    <div class="t2">Source(s): <b id="f-by">--</b></div>
+    <div class="shot">
+      <div class="ph" id="ph-a"></div><div class="ph" id="ph-b" style="opacity:0"></div>
+      <div class="scan"></div>
+      <div class="box2"></div><div class="hair"></div>
+      <div class="tag" id="f-tag">NAME: --</div>
+      <span class="crn a"></span><span class="crn b"></span><span class="crn c"></span><span class="crn d"></span>
+    </div>
+  </div>
+
+  <div class="panel map"><div class="dots"></div><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="t1"><span>INPUT GRID: LIVING ROOM / HDMI-CEC</span><span class="r" id="map-status">STATUS: ACTIVE</span></div>
+    <div id="nodes"></div>
+    <div class="foot">Input grid online — monitoring <b id="map-live">0</b> active signals</div>
+  </div>
+
+  <div class="panel" id="all"><span class="tk a"></span><span class="tk b"></span><span class="tk c"></span><span class="tk d"></span>
+    <div class="ptitle">Full App Index<span class="r"><span class="mute">Back to close · </span><span id="all-count">--</span></span></div>
+    <div class="grid"><div class="inner" id="all-inner"></div></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="designs.js"></script>
+<script>
+(function () {
+  'use strict';
+  var WALLS = [
+    ['01.jpg', 'Aoraki / Mount Cook', 'Michal Klajban'], ['02.jpg', 'Three Sisters, Canmore', 'Jakub Fryš'],
+    ['03.jpg', 'Llyn Ogwen, Milky Way', 'John Badham'], ['04.jpg', 'Aurora borealis, Estonia', 'Kristian Pikner'],
+    ['05.jpg', 'Lake Mystery, Canterbury', 'Michal Klajban'], ['06.jpg', 'Soltan salt lake, Iran', 'Amir Pashaei'],
+    ['07.jpg', 'Sossusvlei, Namibia', 'Diego Delso'], ['08.jpg', 'Sossusvlei dunes, Namibia', 'Diego Delso'],
+    ['09.jpg', 'Geirangerfjord, Norway', 'Ximonic (Simo Räsänen)'], ['10.jpg', 'Lago do Cuniã, Brazil', 'RodrigoErse'],
+    ['11.jpg', 'Tschierva glacier, Switzerland', 'Daniel Schwen'], ['12.jpg', 'View from Herzogenhorn', 'Jörg Braukmann'],
+    ['13.jpg', 'Westruper Heide, Haltern', 'Dietmar Rabich'], ['14.jpg', 'Volcán Pacaya, Guatemala', 'Christopher Crouzet']
+  ];
+  // Where each input sits on the dotted grid (px inside the map panel).
+  var NODE_POS = { TV: [130, 112], HDMI1: [262, 190], HDMI2: [372, 96], HDMI3: [430, 200], AVS: [200, 214] };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var icons = {}, home = [], all = [], sources = [], tvState = null, volume = null, muted = false, online = true;
+  var focused = null, overlay = false, detailApp = null, expanded = null, wall = 0, flip = false, wallAt = Date.now();
+  var started = Date.now(), log = [], fails = 0;
+
+  function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var opened = load('opened') || {}, counts = load('d2-counts') || {};
+
+  // ---------- server ----------
+  function api(path, done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', path, true); x.timeout = 15000;
+    x.onload = function () { var r = null; try { r = JSON.parse(x.responseText); } catch (e) {} if (path.indexOf('/api/') === 0) setOnline(!!r && !r.offline); if (done) done(r); };
+    x.onerror = x.ontimeout = function () { setOnline(false); if (done) done(null); };
+    x.send();
+  }
+  function setOnline(v) {
+    // one slow reply isn't an outage: only call it offline after two failures in a row
+    fails = v ? 0 : fails + 1;
+    if (!v && fails < 2) return;
+    if (v !== online) note(v ? 'Link to TV <span class="ok">re-established</span>' : '<span class="bad">Link to TV lost</span> — retrying');
+    online = v;
+    $('st-link').textContent = v ? 'ONLINE' : 'OFFLINE';
+    $('st-link').className = 'chip ' + (v ? 'g' : 'red');
+    renderSay();
+  }
+
+  // ---------- words ----------
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function clean(n) { return String(n).replace(/[▶︎]/g, '').replace(/\s*[:.]\s*$/, '').trim(); }
+  function inputName(n) { return clean(n).replace(/^HDMI(\d)/i, 'HDMI $1'); }
+  function pad(n) { return ('0' + n).slice(-2); }
+  function clock(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+  function ago(t) {
+    if (!t) return '—';
+    var d = new Date(t), now = new Date();
+    var day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (t >= day0) return 'Today ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function icon(name) {
+    var key = clean(name).toLowerCase();
+    if (icons[key]) return '<img src="icons/' + icons[key] + '.png" alt="">';
+    var w = clean(name).split(/\s+/);
+    return '<span class="mono">' + esc((w[0].charAt(0) + (w[1] ? w[1].charAt(0) : w[0].charAt(1) || '')).toUpperCase()) + '</span>';
+  }
+  function onScreen(name) {
+    var s = tvState || {};
+    return s.statetype === 'app' && clean(s.name || '').toLowerCase() === clean(name).toLowerCase();
+  }
+  function bars(el, frac, n) {
+    var lit = Math.round(Math.max(0, Math.min(1, frac)) * n), h = '';
+    for (var i = 0; i < n; i++) h += '<i' + (i < lit ? ' class="on"' : '') + '></i>';
+    el.innerHTML = h + '<i class="tail"></i>';
+  }
+
+  // ---------- activity log: real events from this launcher ----------
+  function note(html) {
+    log.push({ t: Date.now(), h: html });
+    if (log.length > 40) log.shift();
+    renderExpand();
+  }
+
+  // ---------- render ----------
+  function renderRows() {
+    var keep = focused && $('rows').contains(focused) && focused.getAttribute('data-name');
+    var list = home.slice(0, 4);
+    $('rows').innerHTML = list.map(function (n, i) {
+      var live = onScreen(n);
+      return '<div class="row f" data-act="app" data-name="' + esc(n) + '">' +
+        '<span class="car">' + (expanded === n ? '&#709;' : '&gt;') + '</span>' +
+        '<span class="nm">' + icon(n) + esc(clean(n)) + '</span>' +
+        '<span class="st"><i style="background:' + (live ? 'var(--green)' : opened[clean(n)] ? 'var(--amber)' : '#ddd') + '"></i>' + (live ? 'On Screen' : opened[clean(n)] ? 'Standby' : 'Ready') + '</span>' +
+        '<span class="' + (i === 0 ? 'bad' : i === 1 ? 'warn' : 'mute') + '">' + (i === 0 ? 'PRIMARY' : i === 1 ? 'SECONDARY' : 'STANDARD') + '</span>' +
+        '<span>' + esc(ago(opened[clean(n)])) + '</span></div>' +
+        (expanded === n ? '<div class="expand open" id="expand"></div>' : '');
+    }).join('');
+    renderExpand();
+    if (keep) { var el = $('rows').querySelector('[data-name="' + keep + '"]'); focused = null; focus(el); }
+    else if (!focused) focus($('rows').querySelector('.f'));
+  }
+  function renderExpand() {
+    var box = $('expand'); if (!box || !expanded) return;
+    var n = clean(expanded), lines = log.slice(-3);
+    box.innerHTML = '<div class="meta"><span>&#9673; Objective: <b>Launch ' + esc(n) + '</b></span><span>Slot: <b>' + (home.indexOf(expanded) + 1) + ' of ' + Math.min(4, home.length) + '</b></span>' +
+      '<span>Opens: <b>' + (counts[n] || 0) + '</b></span></div>' +
+      '<div class="log"><div class="h"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Activity Log</div>' +
+      lines.map(function (e) { return '<div class="l"><span class="tm">&gt; [' + clock(new Date(e.t)) + ']</span> ' + e.h + '</div>'; }).join('') + '</div>';
+  }
+  function renderDetail() {
+    var n = detailApp; if (!n) return;
+    var c = clean(n), live = onScreen(n), cnt = counts[c] || 0;
+    $('d-name').textContent = c;
+    var slot = home.indexOf(n);
+    $('d-slot').textContent = slot >= 0 ? 'Home #' + (slot + 1) : 'Index #' + (all.indexOf(n) + 1);
+    $('d-status').textContent = live ? 'On screen' : 'Pending approval';
+    $('d-last').textContent = ago(opened[c]);
+    $('d-count').textContent = String(cnt);
+    $('d-vol').textContent = muted ? 'Muted' : volume == null ? '--' : String(volume);
+    $('d-usage').textContent = cnt >= 10 ? 'HIGH' : cnt >= 3 ? 'MEDIUM' : 'LOW';
+    $('d-bar').style.width = Math.min(100, cnt * 10) + '%';
+    $('d-assess').innerHTML = '<div class="l">Assessment:</div>' +
+      '<div class="l">&gt; ' + (cnt ? 'Opened ' + cnt + ' time' + (cnt === 1 ? '' : 's') + ' from this launcher' : 'Not opened from this launcher yet') + '</div>' +
+      '<div class="l">&gt; Possible complications: ' + (online ? 'none, link to TV is up' : 'TV link offline') + '</div>' +
+      '<div class="l">&gt; Recommended action: ' + (live ? 'already on screen' : 'OPEN') + '</div>';
+  }
+  function renderSay() {
+    var s = tvState || {}, now = 'Launcher';
+    if (s.statetype === 'app' && !/hisensebar/i.test(s.name || '')) now = clean(s.name || 'App');
+    else if (s.sourcename) now = inputName(s.sourcename);
+    else if (s.statetype === 'remote_launcher') now = 'VIDAA home';
+    $('st-now').textContent = now.toUpperCase();
+    var live = sources.filter(function (x) { return x.signal; }).length;
+    $('say').innerHTML = '&gt; ' + (online ? 'Link to TV established.' : 'Link to TV offline. Retrying.') + '<br>' +
+      '&gt; On screen now: ' + esc(now) + '.<br>&gt; ' + all.length + ' apps indexed, ' + live + ' input' + (live === 1 ? '' : 's') + ' live.';
+  }
+  function renderMetrics() {
+    var live = sources.filter(function (x) { return x.signal; }).length, total = sources.length;
+    $('m-apps').textContent = all.length ? String(all.length) : '--';
+    $('m-live').textContent = total ? String(live) : '--';
+    $('m-vol').textContent = muted ? '0' : volume == null ? '--' : String(volume);
+    $('c-apps').textContent = String(all.length);
+    $('c-in').textContent = String(live);
+    $('v-vol').textContent = volume == null ? '--' : String(muted ? 0 : volume);
+    bars($('b-vol'), (muted ? 0 : volume || 0) / 100, 10);
+    $('v-in').innerHTML = live + '<small>/' + total + '</small>';
+    bars($('b-in'), total ? live / total : 0, 10);
+    $('rail-vol').textContent = muted ? 'MUTE' : volume == null ? '--' : volume + '%';
+    renderSay(); renderDetail();
+  }
+  function renderNodes() {
+    var keep = focused && $('nodes').contains(focused) && focused.getAttribute('data-id');
+    var list = sources.filter(function (x) { return NODE_POS[x.id]; }), live = 0;
+    $('nodes').innerHTML = list.map(function (x) {
+      var p = NODE_POS[x.id]; if (x.signal) live++;
+      return '<div class="node f ' + (x.signal ? 'live' : /^tv$/i.test(x.id) ? '' : 'idle') + '" data-act="source" data-id="' + esc(x.id) + '" style="left:' + p[0] + 'px;top:' + p[1] + 'px">' +
+        '<span class="lb">' + esc(inputName(x.name).toUpperCase()) + (x.signal ? ' | LIVE' : '') + '</span><span class="tg"></span></div>';
+    }).join('');
+    $('map-live').textContent = String(live);
+    if (keep) { focused = null; focus($('nodes').querySelector('[data-id="' + keep + '"]')); }
+  }
+  function renderAll() {
+    $('all-inner').innerHTML = all.map(function (n, i) {
+      return '<div class="tile f" data-act="app" data-name="' + esc(n) + '"><span class="ix">' + pad(i + 1) + '</span>' + icon(n) + '<span class="nm">' + esc(clean(n)) + '</span></div>';
+    }).join('');
+    $('all-count').textContent = all.length + ' apps';
+  }
+
+  // ---------- live feed ----------
+  function showWall(i) {
+    wall = (i + WALLS.length) % WALLS.length; wallAt = Date.now(); save('d2-wall', wall);
+    var w = WALLS[wall], a = flip ? $('ph-a') : $('ph-b'), b = flip ? $('ph-b') : $('ph-a');
+    a.style.backgroundImage = 'url(bg/1080s/' + w[0] + ')'; a.style.opacity = 1; b.style.opacity = 0; flip = !flip;
+    $('f-path').textContent = 'LIVE:_//WALL//' + pad(wall + 1) + ' FRAME ' + pad(wall + 1) + '/' + WALLS.length;
+    $('f-by').textContent = w[2];
+    $('f-tag').innerHTML = 'Name: ' + esc(w[1]) + '<br>License: CC BY-SA';
+  }
+
+  // ---------- clock ----------
+  function tick() {
+    var d = new Date(), off = -d.getTimezoneOffset() / 60;
+    $('sync').textContent = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + clock(d) + ' GMT' + (off >= 0 ? '+' : '') + off;
+    var up = (Date.now() - started) / 1000, h = Math.floor(up / 3600), m = Math.floor(up / 60) % 60;
+    $('v-up').textContent = h ? h + 'h ' + pad(m) + 'm' : m + 'm ' + pad(Math.floor(up) % 60) + 's';
+    bars($('b-up'), Math.min(1, up / 3600), 10);
+    if (Date.now() - wallAt > 90000) showWall(wall + 1);
+  }
+
+  // ---------- focus + spatial navigation ----------
+  function focus(el) {
+    if (!el) return;
+    if (focused) focused.classList.remove('on');
+    focused = el; el.classList.add('on');
+    if (el.getAttribute('data-act') === 'app' && !overlay) {
+      detailApp = el.getAttribute('data-name');
+      if (expanded !== detailApp && $('rows').contains(el)) { expanded = detailApp; renderRows(); return; }
+      renderDetail();
+    }
+    if (overlay) { detailApp = el.getAttribute('data-name') || detailApp; renderDetail(); scrollAll(); }
+  }
+  function pool() {
+    var root = overlay ? $('all') : $('stage'), list = root.querySelectorAll('.f'), out = [];
+    for (var i = 0; i < list.length; i++) if (overlay || !$('all').contains(list[i])) out.push(list[i]);
+    if (overlay) { var r = document.querySelectorAll('.rail .f, .detail .f'); for (var j = 0; j < r.length; j++) out.push(r[j]); }
+    return out;
+  }
+  function move(dx, dy) {
+    if (!focused || !document.body.contains(focused)) return focus(pool()[0]);
+    var a = focused.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    var best = null, score = Infinity, list = pool();
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]; if (el === focused) continue;
+      var b = el.getBoundingClientRect(); if (!b.width) continue;
+      var bx = b.left + b.width / 2, by = b.top + b.height / 2;
+      var past = dx ? (dx > 0 ? b.left >= a.right - 4 : b.right <= a.left + 4) : (dy > 0 ? b.top >= a.bottom - 4 : b.bottom <= a.top + 4);
+      if (!past) continue;
+      var along = dx ? (bx - ax) * dx : (by - ay) * dy;
+      var across = dx ? Math.abs(by - ay) : Math.abs(bx - ax);
+      var overlap = dx ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      var s = along + across * 2 - (overlap > 0 ? 500 : 0);
+      if (s < score) { score = s; best = el; }
+    }
+    if (best) focus(best);
+  }
+  function scrollAll() {
+    var inner = $('all-inner'), box = inner.parentNode;
+    if (!inner.contains(focused)) return;
+    var y = +inner.getAttribute('data-y') || 0, top = focused.offsetTop, h = focused.offsetHeight, view = box.clientHeight;
+    if (top < y) y = top; else if (top + h > y + view) y = top + h - view;
+    inner.setAttribute('data-y', String(y));
+    inner.style.transform = 'translateY(' + (-y) + 'px)';
+  }
+
+  // ---------- actions ----------
+  var toastTimer;
+  function toast(msg, err) {
+    var t = $('toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, 2400);
+  }
+  function openApp(name) {
+    var c = clean(name);
+    toast('Launching ' + c);
+    $('prompt').textContent = '> open ' + c.toLowerCase();
+    opened[c] = Date.now(); counts[c] = (counts[c] || 0) + 1;
+    save('opened', opened); save('d2-counts', counts);
+    note('Launch request sent for <b>' + esc(c) + '</b>');
+    api('/api/launch?name=' + encodeURIComponent(name), function (r) {
+      if (!r || !r.ok) { toast('Could not open ' + c, true); note('<span class="bad">Launch failed</span> for ' + esc(c)); }
+      else note('<span class="ok">' + esc(c) + ' opened</span> on TV');
+      renderRows(); renderDetail();
+    });
+  }
+  function openAll(on) {
+    overlay = on; $('all').className = 'panel' + (on ? ' open' : '');
+    if (on) { $('all-inner').style.transform = 'translateY(0)'; $('all-inner').setAttribute('data-y', '0'); focus($('all-inner').querySelector('.f')); $('prompt').textContent = '> show all apps'; }
+    else focus($('rows').querySelector('[data-name="' + (expanded || '') + '"]') || $('rows').querySelector('.f'));
+  }
+  function activate() {
+    var el = focused; if (!el) return;
+    var act = el.getAttribute('data-act');
+    if (act === 'app') openApp(el.getAttribute('data-name'));
+    else if (act === 'open') { if (detailApp) openApp(detailApp); }
+    else if (act === 'cancel') { $('prompt').textContent = '> cancel'; note('Launch of ' + esc(clean(detailApp || '')) + ' <span class="warn">cancelled</span>'); if (overlay) openAll(false); else focus($('rows').querySelector('[data-name="' + (detailApp || '') + '"]') || $('rows').querySelector('.f')); }
+    else if (act === 'all') openAll(true);
+    else if (act === 'home') { if (overlay) openAll(false); else focus($('rows').querySelector('.f')); }
+    else if (act === 'inputs') { if (overlay) openAll(false); focus($('nodes').querySelector('.f')); $('prompt').textContent = '> jump to inputs'; }
+    else if (act === 'next') { showWall(wall + 1); note('Live feed switched to frame ' + pad(wall + 1)); }
+    else if (act === 'settings') { $('prompt').textContent = '> open tv settings'; note('TV settings menu requested'); api('/api/key?k=KEY_MENU'); }
+    else if (act === 'mute') { muted = !muted; renderMetrics(); $('prompt').textContent = '> toggle mute'; note('Audio ' + (muted ? '<span class="warn">muted</span>' : '<span class="ok">unmuted</span>')); api('/api/key?k=KEY_MUTE'); }
+    else if (act === 'source') {
+      var id = el.getAttribute('data-id');
+      toast('Switching to ' + inputName(id)); note('Input switch to <b>' + esc(inputName(id)) + '</b>');
+      api('/api/source?id=' + encodeURIComponent(id), function (r) { if (!r || !r.ok) { toast('Could not switch input', true); note('<span class="bad">Input switch failed</span>'); } });
+    }
+  }
+
+  function keyName(e) {
+    var alias = { Left: 'ArrowLeft', Right: 'ArrowRight', Up: 'ArrowUp', Down: 'ArrowDown', Select: 'Enter', OK: 'Enter', Accept: 'Enter', GoBack: 'Escape', Back: 'Escape', BrowserBack: 'Escape' };
+    if (alias[e.key]) return alias[e.key];
+    switch (e.keyCode || e.which) {
+      case 37: return 'ArrowLeft'; case 38: return 'ArrowUp'; case 39: return 'ArrowRight'; case 40: return 'ArrowDown';
+      case 13: case 23: case 66: return 'Enter';
+      case 27: case 8: case 461: case 10009: return 'Escape';
+    }
+    return e.key;
+  }
+  window.addEventListener('keydown', function (e) {
+    var k = keyName(e);
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape'].indexOf(k) < 0) return;
+    e.preventDefault();
+    if (k === 'ArrowLeft') move(-1, 0);
+    else if (k === 'ArrowRight') move(1, 0);
+    else if (k === 'ArrowUp') move(0, -1);
+    else if (k === 'ArrowDown') move(0, 1);
+    else if (k === 'Escape') { if (overlay) openAll(false); else focus($('rows').querySelector('.f')); }
+    else if (!e.repeat) activate();
+  }, true);
+  document.addEventListener('click', function (e) {
+    var el = e.target; while (el && el !== document && !(el.classList && el.classList.contains('f'))) el = el.parentNode;
+    if (el && el.classList) { focus(el); activate(); }
+  });
+
+  // ---------- data ----------
+  function loadState() { api('/api/state', function (r) { if (r && r.ok) { var was = JSON.stringify(tvState); tvState = r.data; if (was !== JSON.stringify(tvState)) { renderSay(); renderRows(); renderDetail(); } } }); }
+  function loadVolume() { api('/api/volume', function (r) { if (r && r.ok && r.data) { if (r.data.volume_value != null) volume = r.data.volume_value; muted = !!r.data.muted; renderMetrics(); } }); }
+  function loadSources() { api('/api/sources', function (r) { if (r && r.ok && r.data) { sources = r.data; renderNodes(); renderMetrics(); } }); }
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080), st = $('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+  showWall(+(load('d2-wall') || 0));
+  note('Console online, linked to TV');
+  tick(); setInterval(tick, 1000);
+  api('icons/index.json', function (r) {
+    if (r) icons = r;
+    api('/api/apps', function (r) { if (r && r.ok && r.data) { home = r.data; expanded = expanded || home[0]; detailApp = detailApp || home[0]; renderRows(); renderDetail(); } });
+    api('/api/apps?all=1', function (r) { if (r && r.ok && r.data) { all = r.data; renderAll(); renderMetrics(); if (location.hash === '#all') openAll(true); note('<span class="ok">' + all.length + ' apps indexed</span> from TV'); } });
+  });
+  loadSources(); setInterval(loadSources, 30000);
+  loadVolume(); setInterval(loadVolume, 8000);
+  loadState(); setInterval(loadState, 5000);
+  document.body.focus();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Launcher</title>
+<style>
+@font-face { font-family: Geist; src: url(fonts/Geist.woff2) format("woff2"); font-weight: 100 900; }
+:root {
+  --bg: #0a0c0f; --panel: #0f1216; --line: #1e242c; --line-2: #2a313b;
+  --text: #e9edf2; --muted: #6e7884; --dim: #3c444f;
+  --accent: #a6d8ff; --accent-ink: #07131d; --warn: #f3ab3c; --ok: #7be0a6; --bad: #ff7a7a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; }
+body { font-family: Geist, -apple-system, "Helvetica Neue", sans-serif; color: var(--text); font-variant-numeric: tabular-nums; outline: none; }
+#stage { width: 1920px; height: 1080px; transform-origin: 0 0; position: absolute; top: 0; left: 0; padding: 24px; }
+.cap { text-transform: uppercase; letter-spacing: .22em; font-size: 15px; color: var(--muted); }
+.val { font-size: 20px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.frame { border: 1px solid var(--line); background: var(--panel); position: relative; }
+.tick { position: absolute; width: 14px; height: 14px; border-color: var(--line-2); border-style: solid; }
+.tick.tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.tick.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+/* focus: one shared look for everything the remote can land on */
+.f { transition: box-shadow .14s ease-out, background-color .14s ease-out; }
+.f.on { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* ---------- top bar ---------- */
+.top { height: 104px; display: grid; grid-template-columns: 420px 1fr 640px; align-items: center; padding: 0 32px; }
+.clock { display: flex; align-items: center; }
+.clock .big { font-size: 74px; font-weight: 200; letter-spacing: -.02em; line-height: 1; }
+.clock .side { margin-left: 18px; }
+.clock .side .cap { font-size: 13px; }
+.clock .days { margin-top: 8px; font-size: 14px; letter-spacing: .38em; color: var(--dim); }
+.clock .days b { color: var(--text); font-weight: 600; }
+.brand { text-align: center; }
+.brand h1 { font-weight: 400; font-size: 34px; letter-spacing: .5em; padding-left: .5em; }
+.brand .cap { margin-top: 8px; font-size: 14px; }
+.chips { display: flex; justify-content: flex-end; align-items: center; }
+.chip { border: 1px solid var(--line-2); padding: 10px 16px; font-size: 14px; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; margin-left: 14px; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.chip.warn { border-color: var(--warn); color: var(--warn); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.chip.bad { border-color: var(--bad); color: var(--bad); }
+.chips .date { font-size: 34px; font-weight: 300; margin-left: 24px; letter-spacing: .02em; }
+
+/* ---------- body ---------- */
+.body { display: grid; grid-template-columns: 84px 1fr; grid-gap: 16px; margin-top: 16px; height: 912px; }
+.rail { display: flex; flex-direction: column; align-items: center; padding-top: 22px; }
+.rail .ico { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; color: var(--muted); }
+.rail .ico.cur { color: var(--accent); }
+.rail .ico.on { color: var(--accent-ink); background: var(--accent); box-shadow: none; }
+.rail svg, .cell svg, .ring svg { stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rail svg { width: 26px; height: 26px; }
+.rail .foot { margin-top: auto; margin-bottom: 22px; text-align: center; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+.dot.off { background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+
+.main { display: grid; grid-template-rows: 440px 472px; position: relative; min-height: 0; }
+.row1 { display: grid; grid-template-columns: 1fr 760px; min-height: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 470px; min-height: 0; }
+
+/* hero */
+.hero { padding: 28px 30px; display: flex; flex-direction: column; }
+.hero .head { display: flex; justify-content: space-between; align-items: flex-start; }
+.hero h2 { font-size: 22px; font-weight: 500; letter-spacing: .26em; text-transform: uppercase; }
+.hero .sub { margin-top: 8px; font-size: 15px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; }
+.seg { display: flex; border: 1px solid var(--line-2); }
+.seg span { padding: 10px 18px; font-size: 14px; letter-spacing: .2em; color: var(--muted); border-left: 1px solid var(--line-2); text-transform: uppercase; }
+.seg span:first-child { border-left: 0; }
+.seg span.cur { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.focus-art { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+.ring { width: 210px; height: 210px; display: flex; align-items: center; justify-content: center; position: relative; color: var(--text); }
+.ring img, .ring .mono, .ring .brand { width: 150px; height: 150px; border-radius: 34px; }
+.ring svg { width: 96px; height: 96px; }
+.brand { overflow: hidden; }
+.ring .brand svg, .cell .brand svg { width: 100%; height: 100%; margin: 0; stroke: none; display: block; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); grid-gap: 24px; }
+.stats .val { margin-top: 10px; }
+.mono { display: flex; align-items: center; justify-content: center; background: #1a2029; color: var(--text); font-size: 30px; font-weight: 500; letter-spacing: .04em; }
+
+/* wallpaper panel */
+.amb { overflow: hidden; border-left: 0; }
+.amb .photo, #ambient .photo { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-position: center; background-size: cover; transition: opacity .9s ease; }
+.amb .shade { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(10,12,15,.15) 0%, rgba(10,12,15,0) 40%, rgba(10,12,15,.92) 100%); }
+.amb .card { position: absolute; top: 24px; left: 24px; background: rgba(10,12,15,.82); border: 1px solid var(--line-2); padding: 20px 26px; display: flex; align-items: center; max-width: 600px; }
+.amb .card svg { width: 34px; height: 34px; stroke: var(--text); fill: none; stroke-width: 1.6; margin-right: 22px; flex: none; }
+.amb .card .t { font-size: 28px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amb .card .cap { margin-top: 6px; font-size: 14px; }
+.amb .bar { position: absolute; top: 30px; right: 30px; width: 170px; height: 3px; background: #2a313b; }
+.amb .bar i { display: block; height: 3px; width: 0; background: linear-gradient(90deg, #4aa8ff, #a98bff, #ffb27a); }
+.amb .foot { position: absolute; left: 26px; right: 26px; bottom: 22px; display: flex; justify-content: space-between; align-items: flex-end; }
+.amb .foot .cap b { color: var(--text); font-weight: 500; }
+.btn { border: 1px solid var(--line-2); padding: 10px 16px; font-size: 14px; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; background: rgba(10,12,15,.6); margin-left: 10px; }
+.btn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; box-shadow: none; }
+
+/* app cells */
+.apps { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); border-top: 0; overflow: hidden; }
+.cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; color: var(--muted); }
+.apps .cell:nth-child(3n) { border-right: 0; }
+.apps .cell:nth-child(n+4) { border-bottom: 0; }
+.cell img, .cell .mono, .cell .brand { width: 72px; height: 72px; border-radius: 17px; filter: saturate(.8) brightness(.78); font-size: 22px; }
+.cell svg { width: 40px; height: 40px; margin: 12px 0; }
+.cell .name { margin-top: 22px; font-size: 19px; letter-spacing: .28em; text-transform: uppercase; color: #aeb6c0; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell .state { margin-top: 12px; font-size: 13px; letter-spacing: .24em; text-transform: uppercase; color: var(--dim); }
+.cell.on { background-color: rgba(166,216,255,.06); color: var(--text); }
+.cell.on img, .cell.on .mono, .cell.on .brand { filter: none; }
+.cell.on .name { color: var(--text); font-weight: 600; }
+.cell.on .state { color: var(--accent); }
+
+/* right column */
+.rcol { display: grid; grid-template-rows: 214px minmax(0, 1fr); border-top: 0; border-left: 0; overflow: hidden; }
+.blk { padding: 22px 28px; overflow: hidden; }
+.blk + .blk { border-top: 1px solid var(--line); }
+.blk .head { display: flex; justify-content: space-between; align-items: center; }
+.vol { display: flex; align-items: baseline; justify-content: space-between; margin-top: 10px; }
+.vol .num { font-size: 52px; font-weight: 200; line-height: 1; }
+.segbar { display: grid; grid-template-columns: repeat(10, 1fr); grid-gap: 5px; margin-top: 12px; }
+.segbar i { height: 18px; background: #232a33; }
+.segbar i.f2 { background: #e9edf2; }
+.segbar.muted i.f2 { background: #4b5560; }
+.btns { display: flex; margin-top: 16px; }
+.btns .btn { margin: 0 10px 0 0; background: transparent; padding: 8px 18px; }
+.inputs { margin-top: 10px; }
+.inputs .r { display: flex; justify-content: space-between; align-items: center; padding: 11px 12px; margin: 0 -12px; border-bottom: 1px solid var(--line); font-size: 17px; letter-spacing: .16em; text-transform: uppercase; }
+.inputs .r:last-child { border-bottom: 0; }
+.inputs .r .s { font-size: 13px; letter-spacing: .22em; color: var(--dim); }
+.inputs .r .s.live { color: var(--ok); }
+.inputs .r.on { background-color: rgba(166,216,255,.06); }
+
+/* all-apps overlay (covers the main area) */
+#all { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; flex-direction: column; background: var(--panel); }
+#all.open { display: flex; }
+#all .head { display: flex; justify-content: space-between; align-items: center; padding: 26px 30px; border-bottom: 1px solid var(--line); }
+#all .head h2 { font-size: 22px; font-weight: 500; letter-spacing: .26em; text-transform: uppercase; }
+#all .scroll { flex: 1; overflow: hidden; position: relative; }
+#all .grid { display: grid; grid-template-columns: repeat(6, 1fr); position: absolute; left: 0; right: 0; top: 0; transition: transform .2s ease-out; }
+#all .cell { height: 210px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#all .cell:nth-child(6n) { border-right: 0; }
+#all .cell .name { font-size: 15px; letter-spacing: .2em; margin-top: 18px; }
+
+/* ambient */
+#ambient { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; display: none; background: #000; }
+#ambient.open { display: block; }
+#ambient .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 420px; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.75)); }
+#ambient .clk { position: absolute; left: 80px; bottom: 70px; }
+#ambient .clk .big { font-size: 180px; font-weight: 200; line-height: 1; letter-spacing: -.02em; }
+#ambient .clk .cap { color: #c9d0d8; margin-top: 16px; }
+#ambient .credit { position: absolute; right: 80px; bottom: 80px; text-align: right; }
+
+#toast { position: absolute; right: 40px; bottom: 40px; background: rgba(10,12,15,.92); border: 1px solid var(--line-2); padding: 16px 22px; font-size: 15px; letter-spacing: .2em; text-transform: uppercase; opacity: 0; transition: opacity .2s; }
+#toast.show { opacity: 1; }
+#toast.err { border-color: var(--bad); color: var(--bad); }
+</style>
+</head>
+<body tabindex="-1">
+<div id="stage">
+
+  <div class="frame top">
+    <span class="tick tl"></span><span class="tick br"></span>
+    <div class="clock">
+      <div class="big" id="hm">--:--</div>
+      <div class="side"><div class="cap" id="ampm">AM</div><div class="days" id="days"></div></div>
+    </div>
+    <div class="brand"><h1>HISENSE</h1><div class="cap">VIDAA · 4K UHD · LIVING ROOM</div></div>
+    <div class="chips">
+      <span class="chip warn" id="c-now">HOME</span>
+      <span class="chip" id="c-vol">VOL --</span>
+      <span class="chip on" id="c-link">ONLINE</span>
+      <span class="date" id="date"></span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="frame rail">
+      <div class="ico f cur" data-act="home" data-zone="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></div>
+      <div class="ico f" data-act="all" data-zone="apps"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+      <div class="ico f" data-act="inputs" data-zone="inputs"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="1"/><path d="M8 21h8M12 18v3"/></svg></div>
+      <div class="ico f" data-act="ambient" data-zone="ambient"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 15l5-5 4 4 3-3 6 6"/></svg></div>
+      <div class="ico f" data-act="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></div>
+      <div class="foot"><span class="dot" id="link-dot"></span><div class="cap" style="font-size:12px;margin-top:10px;letter-spacing:.1em">LINK</div></div>
+    </div>
+
+    <div class="main">
+      <div class="row1">
+        <div class="frame hero">
+          <div class="head">
+            <div><h2 id="h-name">YouTube</h2><div class="sub" id="h-sub">Press OK to open</div></div>
+            <div class="seg" id="tabs"><span data-zone="home" class="cur">Home</span><span data-zone="apps">Apps</span><span data-zone="inputs">Inputs</span><span data-zone="ambient">Ambient</span></div>
+          </div>
+          <div class="focus-art"><div class="ring" id="h-art"></div></div>
+          <div class="stats">
+            <div><div class="cap">Last opened</div><div class="val" id="s-last">—</div></div>
+            <div><div class="cap">Apps</div><div class="val" id="s-apps">—</div></div>
+            <div><div class="cap">Now on TV</div><div class="val" id="s-now">—</div></div>
+            <div><div class="cap">Inputs live</div><div class="val" id="s-live">—</div></div>
+          </div>
+        </div>
+
+        <div class="frame amb f" data-act="ambient" id="amb">
+          <div class="photo" id="ph-a"></div><div class="photo" id="ph-b" style="opacity:0"></div>
+          <div class="shade"></div>
+          <div class="bar"><i id="bar"></i></div>
+          <div class="card">
+            <svg viewBox="0 0 24 24"><path d="M3 18l6-8 4 5 3-3 5 6z"/><circle cx="17" cy="7" r="2"/></svg>
+            <div><div class="t" id="w-title"></div><div class="cap" id="w-sub"></div></div>
+          </div>
+          <div class="foot">
+            <div class="cap" id="w-credit"></div>
+            <div style="display:flex"><span class="btn f" data-act="next">Next</span><span class="btn f" data-act="ambient">Ambient</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="frame apps" id="cells"></div>
+        <div class="frame rcol">
+          <div class="blk">
+            <div class="head"><span class="cap">Audio</span><span class="cap" id="mute-lbl" style="color:var(--dim)">TV Speaker</span></div>
+            <div class="vol"><span class="num" id="v-num">--</span><span class="cap">Volume / 100</span></div>
+            <div class="segbar" id="v-bar"></div>
+            <div class="btns"><span class="btn f" data-act="vol-">−</span><span class="btn f" data-act="vol+">+</span><span class="btn f" data-act="mute">Mute</span></div>
+          </div>
+          <div class="blk">
+            <div class="head"><span class="cap">Inputs</span><span class="cap" id="in-count" style="color:var(--dim)"></span></div>
+            <div class="inputs" id="inputs"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="all">
+        <div class="head"><h2>All apps</h2><span class="cap">Back to close</span></div>
+        <div class="scroll"><div class="grid" id="all-grid"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ambient">
+    <div class="photo" id="am-a"></div><div class="photo" id="am-b" style="opacity:0"></div>
+    <div class="shade"></div>
+    <div class="clk"><div class="big" id="am-hm"></div><div class="cap" id="am-date"></div></div>
+    <div class="credit"><div class="val" id="am-title"></div><div class="cap" id="am-credit" style="margin-top:8px"></div></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="designs.js"></script>
+<script>
+(function () {
+  'use strict';
+  var WALLS = [
+    {src:'01.jpg', title:'Aoraki / Mount Cook', by:'Michal Klajban', lic:'CC BY-SA 4.0'},
+    {src:'02.jpg', title:'Three Sisters, Canmore', by:'Jakub Fryš', lic:'CC BY-SA 4.0'},
+    {src:'03.jpg', title:'Llyn Ogwen, Milky Way', by:'John Badham', lic:'CC BY-SA 4.0'},
+    {src:'04.jpg', title:'Aurora borealis, Estonia', by:'Kristian Pikner', lic:'CC BY-SA 4.0'},
+    {src:'05.jpg', title:'Lake Mystery, Canterbury', by:'Michal Klajban', lic:'CC BY-SA 4.0'},
+    {src:'06.jpg', title:'Soltan salt lake, Iran', by:'Amir Pashaei', lic:'CC BY-SA 4.0'},
+    {src:'07.jpg', title:'Sossusvlei, Namibia', by:'Diego Delso', lic:'CC BY-SA 4.0'},
+    {src:'08.jpg', title:'Sossusvlei dunes, Namibia', by:'Diego Delso', lic:'CC BY-SA 4.0'},
+    {src:'09.jpg', title:'Geirangerfjord, Norway', by:'Ximonic (Simo Räsänen)', lic:'CC BY-SA 3.0'},
+    {src:'10.jpg', title:'Lago do Cuniã, Brazil', by:'RodrigoErse', lic:'CC BY-SA 4.0'},
+    {src:'11.jpg', title:'Tschierva glacier, Switzerland', by:'Daniel Schwen', lic:'CC BY-SA 2.5'},
+    {src:'12.jpg', title:'View from Herzogenhorn', by:'Jörg Braukmann', lic:'CC BY-SA 4.0'},
+    {src:'13.jpg', title:'Westruper Heide, Haltern', by:'Dietmar Rabich', lic:'CC BY-SA 4.0'},
+    {src:'14.jpg', title:'Volcán Pacaya, Guatemala', by:'Christopher Crouzet', lic:'CC BY-SA 4.0'}
+  ];
+  var ROTATE_MS = 60000;
+  var ICON = {
+    grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>',
+    gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+    globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+    screen: '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="1"/><path d="M8 21h8M12 18v3"/></svg>',
+    photo: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 15l5-5 4 4 3-3 6 6"/></svg>',
+    speaker: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>',
+    home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>'
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var iconIndex = {}, home = [], allApps = [], sources = [], tvState = null, volume = null, muted = false;
+  var focused = null, overlay = false, ambient = false, wall = 0, wallAt = Date.now(), online = true;
+
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  // ---------- server ----------
+  function api(path, done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', path, true); x.timeout = 15000;
+    x.onload = function () { var r = null; try { r = JSON.parse(x.responseText); } catch (e) {} setOnline(!!r && !r.offline); if (done) done(r); };
+    x.onerror = x.ontimeout = function () { setOnline(false); if (done) done(null); };
+    x.send();
+  }
+  function setOnline(v) {
+    online = v;
+    $('c-link').textContent = v ? 'ONLINE' : 'OFFLINE';
+    $('c-link').className = 'chip ' + (v ? 'on' : 'bad');
+    $('link-dot').className = 'dot' + (v ? '' : ' off');
+  }
+
+  // ---------- helpers ----------
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function clean(n) { return String(n).replace(/[▶︎]/g, '').replace(/\s*[:.]\s*$/, '').trim(); }
+  function prettyInput(n) { return clean(n).replace(/^HDMI(\d)/i, 'HDMI $1'); }
+  // Vector marks for the apps that matter most, so they stay crisp at any size (the store PNGs are small and soft).
+  var BRAND = {
+    youtube: '<div class="brand"><svg viewBox="0 0 120 120"><rect width="120" height="120" rx="27" style="fill:#fff"/>' +
+      '<path d="M98.3 42.6a10.6 10.6 0 0 0-7.5-7.5C84.2 33.3 60 33.3 60 33.3s-24.2 0-30.8 1.8a10.6 10.6 0 0 0-7.5 7.5C20 49.2 20 60 20 60s0 10.8 1.7 17.4a10.6 10.6 0 0 0 7.5 7.5c6.6 1.8 30.8 1.8 30.8 1.8s24.2 0 30.8-1.8a10.6 10.6 0 0 0 7.5-7.5C100 70.8 100 60 100 60s0-10.8-1.7-17.4z" style="fill:#ff0033"/>' +
+      '<path d="M52 71.4 72.8 60 52 48.6z" style="fill:#fff"/></svg></div>',
+    netflix: '<div class="brand"><svg viewBox="0 0 120 120"><rect width="120" height="120" rx="27" style="fill:#000"/>' +
+      '<path d="M41 22h15v76c-5.2-.5-10.2-.3-15 .5z" style="fill:#b1060f"/>' +
+      '<path d="M64 22h15v76.5c-4.8-.8-9.8-1-15-.5z" style="fill:#b1060f"/>' +
+      '<path d="M41 22h15l23 76.5c-5-.9-10-1.2-15-.8z" style="fill:#e50914"/></svg></div>'
+  };
+  function iconFor(name) {
+    var key = clean(name).toLowerCase();
+    if (BRAND[key]) return BRAND[key];
+    if (iconIndex[key]) return '<img src="icons/' + iconIndex[key] + '.png" alt="">';
+    if (key === 'tv browser') return ICON.globe;
+    var words = clean(name).split(/\s+/);
+    var mono = (words[0].charAt(0) + (words[1] ? words[1].charAt(0) : words[0].charAt(1) || '')).toUpperCase();
+    return '<div class="mono">' + esc(mono) + '</div>';
+  }
+
+  // ---------- render ----------
+  function renderCells() {
+    var items = home.slice(0, 3).map(function (n) { return { act: 'app', name: n, label: n === 'TV Browser' ? 'Browser' : n, art: iconFor(n), state: 'Ready' }; });
+    while (items.length < 3) items.push(null);
+    items.push({ act: 'all', label: 'All apps', art: ICON.grid, state: allApps.length ? String(allApps.length) : '' });
+    items.push({ act: 'ambient', label: 'Ambient', art: ICON.photo, state: 'Photos' });
+    items.push({ act: 'settings', label: 'Settings', art: ICON.gear, state: 'TV' });
+    var html = items.map(function (it) {
+      if (!it) return '<div class="cell"></div>';
+      return '<div class="cell f" data-act="' + it.act + '"' + (it.name ? ' data-name="' + esc(it.name) + '"' : '') + ' data-zone="home">' +
+        it.art + '<div class="name">' + esc(it.label) + '</div><div class="state">' + esc(it.state) + '</div></div>';
+    }).join('');
+    var keep = focused && focused.getAttribute('data-name');
+    $('cells').innerHTML = html;
+    if (!focused || !document.body.contains(focused)) {
+      var again = keep && $('cells').querySelector('[data-name="' + keep.replace(/"/g, '') + '"]');
+      focus(again || $('cells').querySelector('.f'));
+    }
+  }
+
+  function renderInputs() {
+    var live = 0, keepId = focused && $('inputs').contains(focused) && focused.getAttribute('data-id');
+    $('inputs').innerHTML = sources.filter(function (s) { return /^(tv|hdmi)/i.test(s.id); }).slice(0, 4).map(function (s) {
+      if (s.signal) live++;
+      return '<div class="r f" data-act="source" data-id="' + esc(s.id) + '" data-zone="inputs">' + esc(prettyInput(s.name)) +
+        '<span class="s' + (s.signal ? ' live' : '') + '">' + (s.signal ? '● Signal' : 'No signal') + '</span></div>';
+    }).join('');
+    if (keepId) { focused = null; focus($('inputs').querySelector('[data-id="' + keepId + '"]') || $('inputs').querySelector('.f')); }
+    $('in-count').textContent = String(sources.length);
+    $('s-live').textContent = sources.length ? live + ' / ' + sources.length : '—';
+  }
+
+  function renderAll() {
+    $('all-grid').innerHTML = allApps.map(function (n) {
+      return '<div class="cell f" data-act="app" data-name="' + esc(n) + '" data-zone="apps">' + iconFor(n) + '<div class="name">' + esc(clean(n)) + '</div></div>';
+    }).join('');
+  }
+
+  function renderVolume() {
+    $('v-num').textContent = volume == null ? '--' : String(volume);
+    $('c-vol').textContent = muted ? 'MUTED' : 'VOL ' + (volume == null ? '--' : volume);
+    $('mute-lbl').textContent = muted ? 'Muted' : 'TV Speaker';
+    var lit = volume == null ? 0 : Math.round(volume / 10), html = '';
+    for (var i = 0; i < 10; i++) html += '<i' + (i < lit ? ' class="f2"' : '') + '></i>';
+    $('v-bar').innerHTML = html;
+    $('v-bar').className = 'segbar' + (muted ? ' muted' : '');
+  }
+
+  function renderState() {
+    var s = tvState || {}, label = 'Home';
+    if (s.statetype === 'app') label = /hisensebar/i.test(s.name || '') ? 'Launcher' : clean(s.name || 'App');
+    else if (s.sourcename) label = prettyInput(s.sourcename);
+    else if (s.statetype && s.statetype !== 'remote_launcher') label = s.statetype.replace(/_/g, ' ');
+    $('c-now').textContent = label;
+    $('s-now').textContent = label;
+  }
+
+  function renderHero() {
+    var el = focused, act = el ? el.getAttribute('data-act') : '', name = el && el.getAttribute('data-name');
+    var title = 'Home', sub = 'Use the arrows to move', art = ICON.home;
+    if (act === 'app') { title = clean(name); sub = 'Press OK to open'; art = iconFor(name); }
+    else if (act === 'source') {
+      var src = sources.filter(function (s) { return s.id === el.getAttribute('data-id'); })[0] || {};
+      title = prettyInput(src.name || ''); sub = (src.signal ? 'Signal detected' : 'No signal') + ' · OK to switch'; art = ICON.screen;
+    }
+    else if (act === 'all') { title = 'All apps'; sub = allApps.length + ' installed · OK to browse'; art = ICON.grid; }
+    else if (act === 'settings') { title = 'Settings'; sub = 'Open the TV menu'; art = ICON.gear; }
+    else if (act === 'ambient') { title = 'Ambient'; sub = 'Full-screen photos and clock'; art = ICON.photo; }
+    else if (act === 'next') { title = 'Next photo'; sub = WALLS[(wall + 1) % WALLS.length].title; art = ICON.photo; }
+    else if (act === 'inputs') { title = 'Inputs'; sub = 'Switch HDMI and TV sources'; art = ICON.screen; }
+    else if (act === 'vol-' || act === 'vol+' || act === 'mute') { title = 'Volume'; sub = act === 'mute' ? (muted ? 'OK to unmute' : 'OK to mute') : 'OK to turn ' + (act === 'vol+' ? 'up' : 'down'); art = ICON.speaker; }
+    $('h-name').textContent = title;
+    $('h-sub').textContent = sub;
+    $('h-art').innerHTML = art;
+
+    var zone = overlay ? 'apps' : ambient ? 'ambient' : (el && el.getAttribute('data-zone')) || 'home';
+    var tabs = $('tabs').children;
+    for (var i = 0; i < tabs.length; i++) tabs[i].className = tabs[i].getAttribute('data-zone') === zone ? 'cur' : '';
+    var rail = document.querySelectorAll('.rail .ico');
+    for (var j = 0; j < rail.length; j++) rail[j].classList.toggle('cur', rail[j].getAttribute('data-zone') === zone);
+  }
+
+  // ---------- wallpaper ----------
+  var flip = false;
+  function showWall(i) {
+    wall = (i + WALLS.length) % WALLS.length; wallAt = Date.now();
+    var w = WALLS[wall];
+    var a = flip ? $('ph-a') : $('ph-b'), b = flip ? $('ph-b') : $('ph-a');
+    var aa = flip ? $('am-a') : $('am-b'), bb = flip ? $('am-b') : $('am-a');
+    a.style.backgroundImage = 'url(bg/1080s/' + w.src + ')';
+    aa.style.backgroundImage = 'url(bg/1080s/' + w.src + ')';
+    a.style.opacity = 1; b.style.opacity = 0; aa.style.opacity = 1; bb.style.opacity = 0;
+    flip = !flip;
+    $('w-title').textContent = w.title;
+    $('w-sub').textContent = 'Wallpaper ' + ('0' + (wall + 1)).slice(-2) + ' / ' + WALLS.length;
+    $('w-credit').innerHTML = 'Photo · <b>' + esc(w.by) + '</b> · ' + esc(w.lic);
+    $('am-title').textContent = w.title;
+    $('am-credit').textContent = w.by + ' · ' + w.lic;
+    store('wall', String(wall));
+    if (focused && focused.getAttribute('data-act') === 'next') renderHero();
+  }
+
+  // ---------- clock ----------
+  function tick() {
+    var d = new Date(), h = d.getHours() % 12 || 12, m = ('0' + d.getMinutes()).slice(-2);
+    $('hm').textContent = h + ':' + m;
+    $('am-hm').textContent = h + ':' + m;
+    $('ampm').textContent = d.getHours() < 12 ? 'AM' : 'PM';
+    var names = ['S', 'M', 'T', 'W', 'T', 'F', 'S'], order = [1, 2, 3, 4, 5, 6, 0], out = [];
+    for (var i = 0; i < 7; i++) out.push(order[i] === d.getDay() ? '<b>' + names[order[i]] + '</b>' : names[order[i]]);
+    $('days').innerHTML = out.join(' ');
+    var mon = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    var day = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    $('date').textContent = mon[d.getMonth()] + ' ' + d.getDate();
+    $('am-date').textContent = day[d.getDay()] + ' · ' + mon[d.getMonth()] + ' ' + d.getDate();
+    var p = Math.min(1, (Date.now() - wallAt) / ROTATE_MS);
+    $('bar').style.width = (p * 100) + '%';
+    if (p >= 1) showWall(wall + 1);
+  }
+
+  // ---------- focus + spatial navigation ----------
+  function focus(el) {
+    if (!el) return;
+    if (focused) focused.classList.remove('on');
+    focused = el; el.classList.add('on');
+    if (overlay) scrollAll();
+    renderHero();
+  }
+  function candidates() {
+    var root = overlay ? $('all') : $('stage');
+    var list = root.querySelectorAll('.f'), out = [];
+    for (var i = 0; i < list.length; i++) {
+      if (!overlay && $('all').contains(list[i])) continue;
+      out.push(list[i]);
+    }
+    if (overlay) { var r = document.querySelectorAll('.rail .f'); for (var j = 0; j < r.length; j++) out.push(r[j]); }
+    return out;
+  }
+  function move(dx, dy) {
+    if (!focused) return focus(candidates()[0]);
+    var a = focused.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    var best = null, bestScore = Infinity, list = candidates();
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]; if (el === focused) continue;
+      var b = el.getBoundingClientRect(); if (!b.width) continue;
+      var bx = b.left + b.width / 2, by = b.top + b.height / 2;
+      var along = dx ? (bx - ax) * dx : (by - ay) * dy;
+      // must be in the pressed direction, past our own edge
+      var edge = dx ? (dx > 0 ? b.left >= a.right - 4 : b.right <= a.left + 4) : (dy > 0 ? b.top >= a.bottom - 4 : b.bottom <= a.top + 4);
+      if (along <= 0 || !edge) continue;
+      var across = dx ? Math.abs(by - ay) : Math.abs(bx - ax);
+      var overlap = dx ? (Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) : (Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      var score = along + across * 2 - (overlap > 0 ? 400 : 0);
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    if (best) focus(best);
+  }
+  function scrollAll() {
+    var grid = $('all-grid'), box = grid.parentNode;
+    if (!$('all').contains(focused)) return;
+    var top = focused.offsetTop, h = focused.offsetHeight, cur = -(parseFloat(grid.getAttribute('data-y')) || 0);
+    var view = box.clientHeight, y = cur;
+    if (top < cur) y = top; else if (top + h > cur + view) y = top + h - view;
+    grid.setAttribute('data-y', String(-y));
+    grid.style.transform = 'translateY(' + (-y) + 'px)';
+  }
+
+  // ---------- actions ----------
+  var toastTimer;
+  function toast(msg, err) {
+    var t = $('toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, 2400);
+  }
+  function openApp(name) {
+    toast('Opening ' + clean(name));
+    store('last', clean(name)); $('s-last').textContent = clean(name);
+    api('/api/launch?name=' + encodeURIComponent(name), function (r) { if (!r || !r.ok) toast('Could not open ' + clean(name), true); });
+  }
+  function setVolume(v) {
+    volume = Math.max(0, Math.min(100, v)); muted = false; renderVolume();
+    api('/api/set_volume?v=' + volume);
+  }
+  function openAll(on) {
+    overlay = on; $('all').className = on ? 'open' : '';
+    if (on) { $('all-grid').style.transform = 'translateY(0)'; $('all-grid').setAttribute('data-y', '0'); focus($('all-grid').querySelector('.f')); }
+    else focus($('cells').querySelector('[data-act="all"]'));
+  }
+  function setAmbient(on) {
+    ambient = on; $('ambient').className = on ? 'open' : '';
+    renderHero();
+  }
+  function activate() {
+    var el = focused; if (!el) return;
+    var act = el.getAttribute('data-act');
+    if (act === 'app') openApp(el.getAttribute('data-name'));
+    else if (act === 'all') openAll(true);
+    else if (act === 'home') { if (overlay) openAll(false); focus($('cells').querySelector('.f')); }
+    else if (act === 'inputs') { if (overlay) openAll(false); focus($('inputs').querySelector('.f')); }
+    else if (act === 'ambient') setAmbient(true);
+    else if (act === 'next') showWall(wall + 1);
+    else if (act === 'settings') api('/api/key?k=KEY_MENU');
+    else if (act === 'vol+') setVolume((volume || 0) + 2);
+    else if (act === 'vol-') setVolume((volume || 0) - 2);
+    else if (act === 'mute') { muted = !muted; renderVolume(); api('/api/key?k=KEY_MUTE'); }
+    else if (act === 'source') {
+      var id = el.getAttribute('data-id');
+      toast('Switching to ' + prettyInput(id));
+      api('/api/source?id=' + encodeURIComponent(id), function (r) { if (!r || !r.ok) toast('Could not switch input', true); });
+    }
+  }
+
+  function keyName(e) {
+    var alias = { Left: 'ArrowLeft', Right: 'ArrowRight', Up: 'ArrowUp', Down: 'ArrowDown', Select: 'Enter', OK: 'Enter', Accept: 'Enter', GoBack: 'Escape', Back: 'Escape', BrowserBack: 'Escape' };
+    if (alias[e.key]) return alias[e.key];
+    switch (e.keyCode || e.which) {
+      case 37: return 'ArrowLeft'; case 38: return 'ArrowUp'; case 39: return 'ArrowRight'; case 40: return 'ArrowDown';
+      case 13: case 23: case 66: return 'Enter';
+      case 27: case 8: case 461: case 10009: return 'Escape';
+    }
+    return e.key;
+  }
+  window.addEventListener('keydown', function (e) {
+    var k = keyName(e);
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape'].indexOf(k) < 0) return;
+    e.preventDefault();
+    if (ambient) { setAmbient(false); return; }
+    if (k === 'ArrowLeft') move(-1, 0);
+    else if (k === 'ArrowRight') move(1, 0);
+    else if (k === 'ArrowUp') move(0, -1);
+    else if (k === 'ArrowDown') move(0, 1);
+    else if (k === 'Escape') { if (overlay) openAll(false); else focus($('cells').querySelector('.f')); }
+    else if (!e.repeat) activate();
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (ambient) { setAmbient(false); return; }
+    var el = e.target; while (el && el !== document && !(el.classList && el.classList.contains('f'))) el = el.parentNode;
+    if (el && el.classList) { focus(el); activate(); }
+  });
+
+  // ---------- data ----------
+  function loadState() { api('/api/state', function (r) { if (r && r.ok) { tvState = r.data; renderState(); } }); }
+  function loadVolume() { api('/api/volume', function (r) { if (r && r.ok && r.data) { if (r.data.volume_value != null) volume = r.data.volume_value; muted = !!r.data.muted; renderVolume(); } }); }
+  function loadLists() {
+    api('icons/index.json', function (r) { if (r) { iconIndex = r; renderCells(); renderAll(); } });
+    api('/api/apps', function (r) { if (r && r.ok && r.data) { home = r.data; renderCells(); } });
+    api('/api/apps?all=1', function (r) { if (r && r.ok && r.data) { allApps = r.data; $('s-apps').textContent = allApps.length + ' installed'; renderCells(); renderAll(); } });
+    api('/api/sources', function (r) { if (r && r.ok && r.data) { sources = r.data; renderInputs(); } });
+  }
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080), st = $('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+
+  window.addEventListener('resize', fit);
+  fit();
+  $('s-last').textContent = store('last') || '—';
+  renderCells(); renderVolume(); renderState();
+  showWall(parseInt(store('wall') || '0', 10) || 0);
+  tick(); setInterval(tick, 1000);
+  loadLists(); loadVolume();
+  setInterval(loadState, 5000); loadState();
+  setInterval(loadVolume, 20000);
+  setInterval(function () { api('/api/sources', function (r) { if (r && r.ok && r.data) { sources = r.data; renderInputs(); if (focused && focused.getAttribute('data-act') === 'source') renderHero(); } }); }, 30000);
+  document.body.focus();
+})();
+</script>
+</body>
+</html>

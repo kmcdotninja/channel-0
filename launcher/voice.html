@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TV Voice">
+<link rel="apple-touch-icon" href="voice-icon-180.png">
+<link rel="manifest" href="voice.webmanifest">
+<title>TV Voice</title>
+<style>
+/* DeFleet rules: one sans at one weight, sentence case, soft rounded surfaces on near-black, white primary, one ice accent. */
+@font-face { font-family: Inter; src: url(fonts/Inter-Regular.woff2) format("woff2"); font-weight: 400; }
+:root {
+  --ease: cubic-bezier(.23,1,.32,1);
+  --bg: #0a0b0c; --fg: #f2f4f5; --mute: #8e959a; --faint: #5b6166;
+  --card: #16181a; --tile: #222425; --tile-on: #343638; --line: #26282a;
+  --ice: #64d2ff; --on-ice: #0b0c0d; --red: #ff453a; --green: #30d158;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); }
+body { font: 400 16px/1.4 Inter, -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing: -.02em; color: var(--fg);
+  -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; overscroll-behavior: none;
+  display: flex; flex-direction: column; min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+button { font: inherit; letter-spacing: inherit; color: inherit; border: 0; background: none; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+
+.top { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 0; }
+.top .name { font-size: 17px; }
+.top .name small { display: block; font-size: 13px; color: var(--mute); }
+.pill { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px; background: var(--tile); color: var(--mute); font-size: 13px; white-space: nowrap; }
+.pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); margin-right: 8px; }
+.pill.ok i { background: var(--green); }
+.pill.bad { color: var(--red); background: #3b1f1f; }
+.pill.bad i { background: var(--red); }
+
+.stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 8px; min-height: 260px; }
+.said { font-size: 30px; line-height: 1.2; min-height: 72px; max-width: 340px; overflow-wrap: anywhere; transition: color .2s; }
+.said.idle { color: var(--faint); }
+.hint { margin-top: 10px; color: var(--mute); font-size: 15px; min-height: 21px; }
+.hint.err { color: var(--red); }
+canvas { width: 100%; max-width: 360px; height: 64px; margin-top: 22px; opacity: 0; transition: opacity .25s var(--ease); }
+canvas.on { opacity: 1; }
+
+.mic-wrap { display: flex; justify-content: center; padding: 8px 0 22px; }
+.mic { position: relative; width: 132px; height: 132px; border-radius: 50%; background: var(--fg); color: var(--on-ice); display: grid; place-items: center;
+  transition: transform .2s var(--ease), background-color .2s; }
+.mic svg { width: 46px; height: 46px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mic:active { transform: scale(.96); }
+.mic.on { background: var(--ice); transform: scale(1.04); }
+.mic .ring { position: absolute; inset: -10px; border-radius: 50%; border: 2px solid var(--ice); opacity: 0; transform: scale(.9); pointer-events: none; }
+.mic.on .ring { animation: ring 1.6s var(--ease) infinite; }
+@keyframes ring { 0% { opacity: .7; transform: scale(.92); } 100% { opacity: 0; transform: scale(1.25); } }
+.mic:disabled { background: var(--tile); color: var(--faint); }
+
+.chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chip { height: 52px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 15px; transition: background-color .15s, transform .15s var(--ease); }
+.chip:active { background: var(--tile-on); transform: scale(.97); }
+
+.type { display: flex; gap: 8px; margin-top: 10px; }
+.type input { flex: 1; min-width: 0; height: 52px; padding: 0 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); color: var(--fg);
+  font: 400 16px Inter, -apple-system, Arial, sans-serif; letter-spacing: -.02em; outline: none; }   /* 16px: iOS doesn't zoom */
+.type input:focus { border-color: var(--ice); }
+.type input::placeholder { color: var(--faint); }
+.type button { width: 52px; height: 52px; border-radius: 16px; background: var(--fg); color: var(--on-ice); display: grid; place-items: center; }
+.type button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-reduced-motion: reduce) { .mic.on .ring { animation: none; opacity: .5; } }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="name">TV Voice<small>Living room TV</small></div>
+    <span class="pill" id="link"><i></i><span>Connecting</span></span>
+  </div>
+
+  <div class="stage">
+    <div class="said idle" id="said">Hold the button and speak</div>
+    <div class="hint" id="hint">Try “open Netflix”, “volume up” or “HDMI 1”</div>
+    <canvas id="wave" width="720" height="128"></canvas>
+  </div>
+
+  <div class="mic-wrap">
+    <button class="mic" id="mic" aria-label="Hold to speak">
+      <span class="ring"></span>
+      <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+    </button>
+  </div>
+
+  <div class="chips">
+    <button class="chip" data-say="open YouTube">YouTube</button>
+    <button class="chip" data-say="open Netflix">Netflix</button>
+    <button class="chip" data-say="HDMI 1">HDMI 1</button>
+    <button class="chip" data-say="volume down">Volume −</button>
+    <button class="chip" data-say="volume up">Volume +</button>
+    <button class="chip" data-say="mute">Mute</button>
+  </div>
+
+  <form class="type" id="type" autocomplete="off">
+    <input id="text" type="text" enterkeyhint="send" placeholder="Or type: open spotify" aria-label="Type a command">
+    <button type="submit" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </form>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, listening = false, finalText = '', interimText = '', pressAt = 0, toggled = false, lastSent = 0;
+  var stream = null, ctx = null, analyser = null, raf = 0, noWave = false;
+
+  // ---------- server ----------
+  function send(state, text, done) {
+    var x = new XMLHttpRequest();
+    x.open('POST', '/api/voice', true);
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.timeout = 5000;
+    x.onload = function () { setLink(x.status === 200); if (done) done(x.status === 200); };
+    x.onerror = x.ontimeout = function () { setLink(false); if (done) done(false); };
+    x.send(JSON.stringify({ state: state, text: text || '' }));
+  }
+  function setLink(ok) {
+    $('link').className = 'pill ' + (ok ? 'ok' : 'bad');
+    $('link').lastChild.textContent = ok ? 'Connected' : 'TV launcher offline';
+  }
+  (function ping() {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/api/voice/poll?since=-1', true); x.timeout = 4000;
+    x.onload = function () { setLink(x.status === 200); }; x.onerror = x.ontimeout = function () { setLink(false); };
+    x.send();
+    setTimeout(ping, 15000);
+  })();
+
+  // ---------- words on screen ----------
+  function say(text, idle) { $('said').textContent = text; $('said').className = 'said' + (idle ? ' idle' : ''); }
+  function hint(text, err) { $('hint').textContent = text; $('hint').className = 'hint' + (err ? ' err' : ''); }
+  function sendCommand(text) {
+    text = String(text || '').trim();
+    if (!text) return;
+    say('“' + text + '”');
+    hint('Sending to the TV…');
+    send('final', text, function (ok) { hint(ok ? 'Sent · watch the TV' : 'Couldn’t reach the TV launcher', !ok); });
+  }
+
+  // ---------- waveform: live mic level while listening (best effort; speech works without it) ----------
+  function startWave() {
+    if (noWave || !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return;
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function (s) {
+      if (!listening) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+      stream = s;
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+      analyser = ctx.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = .75;
+      ctx.createMediaStreamSource(s).connect(analyser);
+      $('wave').className = 'on';
+      draw();
+    }).catch(function () { /* waveform is optional */ });
+  }
+  function stopWave() {
+    cancelAnimationFrame(raf);
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; analyser = null;
+    $('wave').className = '';
+  }
+  function draw() {
+    var c = $('wave'), g = c.getContext('2d'), n = 36, w = c.width, h = c.height, data = new Uint8Array(analyser ? analyser.frequencyBinCount : 0);
+    function frame() {
+      if (!analyser) return;
+      analyser.getByteFrequencyData(data);
+      g.clearRect(0, 0, w, h);
+      g.fillStyle = '#64d2ff';
+      var bw = w / n;
+      for (var i = 0; i < n; i++) {
+        var v = data[Math.floor(i * data.length / n / 2)] / 255;
+        var bh = Math.max(6, v * h);
+        var x = i * bw + bw * .3, y = (h - bh) / 2, r = bw * .2;
+        g.beginPath();
+        g.moveTo(x + r, y); g.arcTo(x + bw * .4, y, x + bw * .4, y + bh, r); g.arcTo(x + bw * .4, y + bh, x, y + bh, r);
+        g.arcTo(x, y + bh, x, y, r); g.arcTo(x, y, x + bw * .4, y, r); g.fill();
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    frame();
+  }
+
+  // ---------- speech ----------
+  function makeRec(lang) {
+    var r = new Rec();
+    r.lang = lang; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+    r.onresult = function (e) {
+      var interim = '';
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      interimText = interim;
+      var live = (finalText + ' ' + interim).trim();
+      if (live) {
+        say(live);
+        if (Date.now() - lastSent > 120) { lastSent = Date.now(); send('interim', live); }
+      }
+    };
+    r.onerror = function (e) {
+      if (e.error === 'audio-capture' && stream) {
+        // Some phones can't share the mic between the waveform and speech; drop the waveform and go again.
+        noWave = true; stopWave();
+        if (listening) { try { rec.start(); } catch (x) {} }
+        return;
+      }
+      var msg = {
+        'not-allowed': 'Microphone blocked. Allow it for this site in your browser settings.',
+        'service-not-allowed': 'Speech recognition isn’t allowed here. Use the text box below.',
+        'network': 'Speech needs an internet connection on your phone.',
+        'no-speech': 'Didn’t catch that. Hold the button and try again.',
+        'language-not-supported': ''
+      }[e.error];
+      if (e.error === 'language-not-supported' && rec.lang !== 'en-US') { rec = makeRec('en-US'); if (listening) { try { rec.start(); } catch (x) {} } return; }
+      if (msg) hint(msg, e.error !== 'no-speech');
+    };
+    r.onend = function () {
+      if (!listening) return;
+      finish();
+    };
+    return r;
+  }
+
+  function start() {
+    if (listening) return;
+    if (!Rec) return;
+    listening = true; finalText = ''; interimText = '';
+    $('mic').className = 'mic on';
+    say('Listening…', true);
+    hint('Speak now');
+    send('listening', '');
+    if (navigator.vibrate) navigator.vibrate(12);
+    rec = rec || makeRec('en-NG');
+    try { rec.start(); } catch (x) {}
+    startWave();
+  }
+  function stop() {
+    if (!listening) return;
+    try { rec.stop(); } catch (x) { finish(); }   // onend → finish() sends the final text
+  }
+  function finish() {
+    listening = false; toggled = false;
+    $('mic').className = 'mic';
+    stopWave();
+    var text = (finalText || interimText).trim();
+    if (text) sendCommand(text);
+    else { say('Hold the button and speak', true); if (!/err/.test($('hint').className)) hint('Nothing heard'); send('idle', ''); }
+  }
+
+  // Hold to talk; a quick tap toggles instead (tap again or pause to send).
+  var mic = $('mic');
+  function down(e) { e.preventDefault(); if (listening && toggled) { stop(); return; } pressAt = Date.now(); start(); }
+  function up(e) {
+    e.preventDefault();
+    if (!listening || toggled) return;
+    if (Date.now() - pressAt < 350) { toggled = true; hint('Listening · tap again to send'); return; }
+    stop();
+  }
+  mic.addEventListener('pointerdown', down);
+  mic.addEventListener('pointerup', up);
+  mic.addEventListener('pointercancel', up);
+  mic.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  if (!Rec) {
+    mic.disabled = true;
+    say('Voice isn’t available in this browser', true);
+    hint('Use Chrome on Android or Safari on iPhone, or type below.', true);
+  }
+
+  // ---------- chips and typing ----------
+  var chips = document.querySelectorAll('.chip');
+  for (var i = 0; i < chips.length; i++) chips[i].addEventListener('click', function () { sendCommand(this.getAttribute('data-say')); });
+  $('type').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var t = $('text').value; $('text').value = ''; $('text').blur();
+    sendCommand(t);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Voice check</title></head>
+<body style="background:#111;color:#f2f2f2;font:40px/1.4 sans-serif;padding:120px">
+<div>Voice check</div>
+<div style="font-size:30px;color:#aaa;margin-top:20px">Press the <b style="color:#fff">microphone button</b> on your remote now, then a few other buttons.<br>Returning to your launcher in <span id="n">25</span> s.</div>
+<div id="log" style="font-size:26px;color:#7be0a6;margin-top:30px"></div>
+<script>
+// Reports what voice input the TV's browser offers, and which key codes the remote sends, to the server log.
+(function () {
+  function send(o) { new Image().src = '/_log?voice=' + encodeURIComponent(JSON.stringify(o)); }
+  var r = {
+    speech: typeof window.SpeechRecognition !== 'undefined' || typeof window.webkitSpeechRecognition !== 'undefined',
+    media: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+    secure: window.isSecureContext
+  };
+  send(r);
+  if (r.media) {
+    navigator.mediaDevices.enumerateDevices().then(function (d) {
+      send({ devices: d.map(function (x) { return x.kind + ':' + (x.label || '?'); }) });
+    }).catch(function (e) { send({ devicesErr: String(e) }); });
+  }
+  window.addEventListener('keydown', function (e) {
+    send({ key: e.key, code: e.code, keyCode: e.keyCode });
+    document.getElementById('log').textContent += ' ' + (e.key || '') + '(' + e.keyCode + ')';
+    e.preventDefault();
+  }, true);
+  var n = 25;
+  setInterval(function () { n--; document.getElementById('n').textContent = n; if (n <= 0) location.href = '/'; }, 1000);
+})();
+</script></body></html>

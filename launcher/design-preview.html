@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Launcher design preview</title>
+<style>
+@font-face { font-family: Geist; src: url(fonts/Geist.woff2) format("woff2"); font-weight: 100 900; }
+:root {
+  --bg: #0a0c0f; --panel: #0f1216; --line: #1e242c; --line-2: #2a313b;
+  --text: #e9edf2; --muted: #6e7884; --dim: #3c444f;
+  --accent: #a6d8ff; --accent-ink: #07131d; --warn: #f3ab3c; --ok: #7be0a6;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; }
+body { font-family: Geist, -apple-system, "Helvetica Neue", sans-serif; color: var(--text); font-variant-numeric: tabular-nums; }
+#stage { width: 1920px; height: 1080px; transform-origin: 0 0; position: absolute; top: 0; left: 0; padding: 24px; }
+.cap { text-transform: uppercase; letter-spacing: .22em; font-size: 15px; color: var(--muted); }
+.val { font-size: 20px; letter-spacing: .08em; text-transform: uppercase; }
+.frame { border: 1px solid var(--line); background: var(--panel); position: relative; }
+
+/* corner ticks on the outer frame */
+.tick { position: absolute; width: 14px; height: 14px; border-color: var(--line-2); border-style: solid; }
+.tick.tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.tick.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+/* ---------- top bar ---------- */
+.top { height: 104px; display: grid; grid-template-columns: 420px 1fr 620px; align-items: center; padding: 0 32px; }
+.clock { display: flex; align-items: center; }
+.clock .big { font-size: 74px; font-weight: 200; letter-spacing: -.02em; line-height: 1; }
+.clock .side { margin-left: 18px; }
+.clock .side .cap { font-size: 13px; }
+.clock .days { margin-top: 8px; font-size: 14px; letter-spacing: .38em; color: var(--dim); }
+.clock .days b { color: var(--text); font-weight: 600; }
+.brand { text-align: center; }
+.brand h1 { font-weight: 400; font-size: 34px; letter-spacing: .5em; padding-left: .5em; }
+.brand .cap { margin-top: 8px; font-size: 14px; }
+.chips { display: flex; justify-content: flex-end; align-items: center; }
+.chip { border: 1px solid var(--line-2); padding: 10px 16px; font-size: 14px; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; margin-left: 14px; }
+.chip.warn { border-color: var(--warn); color: var(--warn); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.chips .time { font-size: 34px; font-weight: 300; margin-left: 24px; letter-spacing: .02em; }
+
+/* ---------- body ---------- */
+.body { display: grid; grid-template-columns: 84px 1fr; grid-gap: 16px; margin-top: 16px; height: 912px; }
+.rail { display: flex; flex-direction: column; align-items: center; padding-top: 22px; }
+.rail .ico { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; color: var(--muted); }
+.rail .ico.sel { color: var(--accent); border-left: 2px solid var(--accent); }
+.rail svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.rail .foot { margin-top: auto; margin-bottom: 22px; text-align: center; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+
+.main { display: grid; grid-template-rows: 470px 1fr; grid-gap: 0; }
+.row1 { display: grid; grid-template-columns: 1fr 760px; }
+.row2 { display: grid; grid-template-columns: 1fr 470px; }
+
+/* hero */
+.hero { padding: 28px 30px; display: flex; flex-direction: column; }
+.hero .head { display: flex; justify-content: space-between; align-items: flex-start; }
+.hero h2 { font-size: 22px; font-weight: 500; letter-spacing: .26em; text-transform: uppercase; }
+.hero .sub { margin-top: 8px; font-size: 15px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; }
+.seg { display: flex; border: 1px solid var(--line-2); }
+.seg span { padding: 10px 18px; font-size: 14px; letter-spacing: .2em; color: var(--muted); border-left: 1px solid var(--line-2); text-transform: uppercase; }
+.seg span:first-child { border-left: 0; }
+.seg span.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.focus-art { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+.focus-art .ring { width: 230px; height: 230px; border-radius: 50%; border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; position: relative; }
+.focus-art .ring:before { content: ""; position: absolute; inset: -22px; top: -22px; left: -22px; right: -22px; bottom: -22px; border-radius: 50%; border: 1px dashed var(--line); }
+.focus-art img { width: 118px; height: 118px; border-radius: 26px; }
+.focus-art .glow { position: absolute; width: 360px; height: 120px; bottom: 6px; background: radial-gradient(ellipse at center, rgba(166,216,255,.22), rgba(166,216,255,0) 70%); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); }
+.stats .val { margin-top: 10px; }
+
+/* ambient / wallpaper panel */
+.amb { overflow: hidden; border-left: 0; }
+.amb .photo { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url(bg/1080s/01.jpg) center/cover; }
+.amb .photo:after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(10,12,15,.15) 0%, rgba(10,12,15,0) 40%, rgba(10,12,15,.92) 100%); }
+.amb .card { position: absolute; top: 24px; left: 24px; background: rgba(10,12,15,.82); border: 1px solid var(--line-2); padding: 20px 26px; display: flex; align-items: center; }
+.amb .card svg { width: 34px; height: 34px; stroke: var(--text); fill: none; stroke-width: 1.6; margin-right: 22px; }
+.amb .card .t { font-size: 30px; font-weight: 400; letter-spacing: .06em; }
+.amb .card .cap { margin-top: 6px; font-size: 14px; }
+.amb .bar { position: absolute; top: 30px; right: 30px; width: 170px; height: 3px; background: linear-gradient(90deg, #4aa8ff, #a98bff, #ffb27a); }
+.amb .foot { position: absolute; left: 26px; right: 26px; bottom: 22px; display: flex; justify-content: space-between; align-items: flex-end; }
+.amb .foot .cap b { color: var(--text); font-weight: 500; }
+
+/* app cells */
+.apps { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; border-top: 0; }
+.cell { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.cell:nth-child(3n) { border-right: 0; }
+.cell:nth-child(n+4) { border-bottom: 0; }
+.cell img { width: 64px; height: 64px; border-radius: 14px; filter: grayscale(1) brightness(.75); }
+.cell svg { width: 40px; height: 40px; stroke: var(--muted); fill: none; stroke-width: 1.5; margin: 12px 0; }
+.cell .name { margin-top: 22px; font-size: 19px; letter-spacing: .28em; text-transform: uppercase; color: #aeb6c0; }
+.cell .state { margin-top: 12px; font-size: 13px; letter-spacing: .24em; text-transform: uppercase; color: var(--dim); }
+.cell.sel { background: linear-gradient(180deg, rgba(166,216,255,.07), rgba(166,216,255,0)); box-shadow: inset 0 0 0 2px var(--accent); }
+.cell.sel img { filter: none; }
+.cell.sel .name { color: var(--text); font-weight: 600; }
+.cell.sel .state { color: var(--accent); }
+
+/* right column */
+.side { display: grid; grid-template-rows: 1fr 1fr; border-top: 0; border-left: 0; }
+.blk { padding: 26px 28px; }
+.blk + .blk { border-top: 1px solid var(--line); }
+.blk .head { display: flex; justify-content: space-between; align-items: center; }
+.vol { display: flex; align-items: baseline; justify-content: space-between; margin-top: 18px; }
+.vol .num { font-size: 64px; font-weight: 200; line-height: 1; }
+.segbar { display: grid; grid-template-columns: repeat(10, 1fr); grid-gap: 5px; margin-top: 18px; }
+.segbar i { height: 22px; background: #232a33; }
+.segbar i.f { background: #e9edf2; }
+.btns { display: flex; margin-top: 20px; }
+.btns span { border: 1px solid var(--line-2); padding: 10px 14px; font-size: 13px; letter-spacing: .18em; color: var(--muted); margin-right: 10px; text-transform: uppercase; }
+.btns span.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.inputs { margin-top: 16px; }
+.inputs .r { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 17px; letter-spacing: .16em; text-transform: uppercase; }
+.inputs .r:last-child { border-bottom: 0; }
+.inputs .r .s { font-size: 13px; letter-spacing: .22em; color: var(--dim); }
+.inputs .r .s.live { color: var(--ok); }
+
+.hint { position: absolute; bottom: 30px; right: 44px; font-size: 13px; letter-spacing: .24em; color: var(--dim); text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- top bar -->
+  <div class="frame top">
+    <span class="tick tl"></span><span class="tick br"></span>
+    <div class="clock">
+      <div class="big" id="hm">00:24</div>
+      <div class="side">
+        <div class="cap">AM</div>
+        <div class="days" id="days">M T W <b>T</b> F S S</div>
+      </div>
+    </div>
+    <div class="brand">
+      <h1>HISENSE</h1>
+      <div class="cap">VIDAA · 4K UHD · LIVING ROOM</div>
+    </div>
+    <div class="chips">
+      <span class="chip warn">HDMI 1</span>
+      <span class="chip">WI-FI · LAN</span>
+      <span class="chip on">ONLINE</span>
+      <span class="time" id="date">OCT 23</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- rail -->
+    <div class="frame rail">
+      <div class="ico sel"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="1"/><path d="M8 21h8M12 18v3"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 15l5-5 4 4 3-3 6 6"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></div>
+      <div class="foot"><span class="dot"></span><div class="cap" style="font-size:12px;margin-top:10px;letter-spacing:.1em">LINK</div></div>
+    </div>
+
+    <div class="main">
+      <div class="row1">
+        <!-- focused app hero -->
+        <div class="frame hero">
+          <div class="head">
+            <div>
+              <h2>YouTube</h2>
+              <div class="sub">Focused · press OK to open</div>
+            </div>
+            <div class="seg"><span class="on">Home</span><span>Apps</span><span>Inputs</span><span>Ambient</span></div>
+          </div>
+          <div class="focus-art">
+            <div class="glow"></div>
+            <div class="ring"><img src="icons/youtube.png" alt=""></div>
+          </div>
+          <div class="stats">
+            <div><div class="cap">Last opened</div><div class="val">Netflix</div></div>
+            <div><div class="cap">Apps</div><div class="val">38 installed</div></div>
+            <div><div class="cap">Picture</div><div class="val">Standard</div></div>
+            <div><div class="cap">Source</div><div class="val">Smart TV</div></div>
+          </div>
+        </div>
+
+        <!-- ambient wallpaper -->
+        <div class="frame amb">
+          <div class="photo"></div>
+          <div class="bar"></div>
+          <div class="card">
+            <svg viewBox="0 0 24 24"><path d="M3 18l6-8 4 5 3-3 5 6z"/><circle cx="17" cy="7" r="2"/></svg>
+            <div>
+              <div class="t">AORAKI / MT COOK</div>
+              <div class="cap">Wallpaper 01 / 14 · New Zealand</div>
+            </div>
+          </div>
+          <div class="foot">
+            <div class="cap">Photo · <b>Michal Klajban</b> · CC BY-SA 4.0</div>
+            <div class="seg"><span class="on">Rotate</span><span>Hold</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <!-- app cells -->
+        <div class="frame apps">
+          <div class="cell sel"><img src="icons/youtube.png" alt=""><div class="name">YouTube</div><div class="state">Open</div></div>
+          <div class="cell"><img src="icons/netflix.png" alt=""><div class="name">Netflix</div><div class="state">Ready</div></div>
+          <div class="cell"><img src="icons/plex.png" alt=""><div class="name">Plex</div><div class="state">Ready</div></div>
+          <div class="cell"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><div class="name">Browser</div><div class="state">Ready</div></div>
+          <div class="cell"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><div class="name">All apps</div><div class="state">38</div></div>
+          <div class="cell"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><div class="name">Settings</div><div class="state">TV</div></div>
+        </div>
+
+        <!-- right column -->
+        <div class="frame side">
+          <div class="blk">
+            <div class="head"><span class="cap">Audio</span><span class="chip" style="margin:0;padding:6px 12px;font-size:12px">TV Speaker</span></div>
+            <div class="vol"><span class="num">24</span><span class="cap">Volume / 100</span></div>
+            <div class="segbar"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="btns"><span class="on">Auto</span><span>Mute</span><span>Night</span></div>
+          </div>
+          <div class="blk">
+            <div class="head"><span class="cap">Inputs</span><span class="cap" style="color:var(--dim)">4</span></div>
+            <div class="inputs">
+              <div class="r">HDMI 1<span class="s live">● Signal</span></div>
+              <div class="r">HDMI 2<span class="s">No signal</span></div>
+              <div class="r">HDMI 3<span class="s">No signal</span></div>
+              <div class="r">TV<span class="s">Antenna</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">Design preview · not interactive</div>
+</div>
+<script>
+(function () {
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    var st = document.getElementById('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+  function tick() {
+    var d = new Date(), h = d.getHours() % 12 || 12, m = ('0' + d.getMinutes()).slice(-2);
+    document.getElementById('hm').textContent = h + ':' + m;
+    document.querySelector('.clock .cap').textContent = d.getHours() < 12 ? 'AM' : 'PM';
+    var names = ['S', 'M', 'T', 'W', 'T', 'F', 'S'], order = [1, 2, 3, 4, 5, 6, 0], html = [];
+    for (var i = 0; i < 7; i++) html.push(order[i] === d.getDay() ? '<b>' + names[order[i]] + '</b>' : names[order[i]]);
+    document.getElementById('days').innerHTML = html.join(' ');
+    var mon = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    document.getElementById('date').textContent = mon[d.getMonth()] + ' ' + d.getDate();
+  }
+  window.addEventListener('resize', fit);
+  fit(); tick(); setInterval(tick, 10000);
+})();
+</script>
+</body>
+</html>

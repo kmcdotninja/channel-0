@@ -1,0 +1,12 @@
+{
+  "name": "TV Voice",
+  "short_name": "TV Voice",
+  "start_url": "/voice.html",
+  "display": "standalone",
+  "background_color": "#0a0b0c",
+  "theme_color": "#0a0b0c",
+  "icons": [
+    { "src": "/voice-icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/voice-icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

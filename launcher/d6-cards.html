@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Space cards</title>
+<style>
+@font-face { font-family: "Bagel Fat One"; src: url(fonts/BagelFatOne.woff2) format("woff2"); }
+@font-face { font-family: "Archivo Black"; src: url(fonts/ArchivoBlack.woff2) format("woff2"); }
+@font-face { font-family: Archivo; src: url(fonts/Archivo-700.woff2) format("woff2"); font-weight: 700; }
+@font-face { font-family: Archivo; src: url(fonts/Archivo-800.woff2) format("woff2"); font-weight: 800; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #efe2e0; }
+body { position: relative; font-family: Archivo, sans-serif; color: #2b2a2a; }
+.head { position: absolute; left: 72px; top: 44px; right: 72px; display: flex; align-items: flex-end; justify-content: space-between; }
+.head h1 { font: 400 64px/1 "Bagel Fat One"; letter-spacing: -.01em; }
+.head .meta { font: 800 13px/1.35 Archivo; text-transform: uppercase; letter-spacing: .06em; text-align: right; }
+.sheet { position: absolute; left: 72px; top: 150px; display: grid; grid-template-columns: repeat(4, 420px); grid-gap: 30px 26px; }
+.sheet figure { width: 420px; }
+.sheet canvas { display: block; width: 420px; height: 262px; border-radius: 22px; }
+.sheet figcaption { margin-top: 9px; font: 800 11.5px Archivo; text-transform: uppercase; letter-spacing: .06em; display: flex; justify-content: space-between; }
+.sheet figcaption span { opacity: .55; }
+</style>
+</head>
+<body>
+<div class="head">
+  <h1>Space — the card series</h1>
+  <div class="meta">Design 6 · one poster per app<br>6 templates · 7 colours · 3 typefaces<br>Painted to canvas → WebGL textures</div>
+</div>
+<div class="sheet" id="sheet"></div>
+<script src="d6-cards.js"></script>
+<script>
+(function () {
+  var day = 864e5, now = Date.now();
+  var ITEMS = [
+    { kind: 'app', name: 'YouTube', index: 1, total: 38, opened: now - 3 * 3600e3 },
+    { kind: 'app', name: 'Netflix', index: 2, total: 38, opened: now - day * 1.2 },
+    { kind: 'app', name: 'Prime Video', index: 3, total: 38, opened: null },
+    { kind: 'app', name: 'Spotify : Music & Podcasts', index: 11, total: 38, opened: now - day * 3 },
+    { kind: 'app', name: 'DStv Now', index: 8, total: 38, opened: null },
+    { kind: 'app', name: 'NBA', index: 19, total: 38, opened: null },
+    { kind: 'app', name: 'Deezer', index: 17, total: 38, opened: now - day * 2 },
+    { kind: 'app', name: 'UFC', index: 30, total: 38, opened: null },
+    { kind: 'input', name: 'HDMI 1', index: 2, total: 6, live: true, template: 'stamp' },
+    { kind: 'util', name: 'All apps', index: 38, total: 38, template: 'list',
+      lines: ['YouTube', 'Netflix', 'Prime Video', 'DStv Now', 'Spotify', '+ 33 more'] },
+    { kind: 'util', name: 'Photos', index: 1, total: 14, template: 'arch', photo: 'bg/1080s/01.jpg', sub: 'Aoraki / Mt Cook' },
+    { kind: 'util', name: 'Settings', index: 1, total: 1, template: 'vertical', sub: 'TV menu' }
+  ];
+  function get(url) { return fetch(url).then(function (r) { return r.json(); }).catch(function () { return {}; }); }
+  get('icons/index.json').then(function (icons) {
+    return D6Cards.ready(icons, ['bg/1080s/01.jpg']);
+  }).then(function () {
+    var sheet = document.getElementById('sheet');
+    ITEMS.forEach(function (it) {
+      var fig = document.createElement('figure'), cv = document.createElement('canvas');
+      D6Cards.paint(cv, it, 2);
+      var t = it.template || D6Cards.identity(it).t;
+      fig.appendChild(cv);
+      var cap = document.createElement('figcaption');
+      cap.innerHTML = it.name.replace(/\s*:.*$/, '') + '<span>' + t + '</span>';
+      fig.appendChild(cap);
+      sheet.appendChild(fig);
+    });
+    document.title = 'Space cards · ready';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home</title>
+<style>
+/* Same rules as DeFleet: one sans at one weight (400), -2% tracking, sentence case. Hierarchy is size, grey and space.
+   White is the brand; ice marks what is live, chosen or focused; status colours mean status only.
+   Sizes are DeFleet's doubled for a screen seen from the sofa. */
+@font-face { font-family: Inter; src: url(fonts/Inter-Regular.woff2) format("woff2"); font-weight: 400; }
+:root {
+  --ease-out: cubic-bezier(.23,1,.32,1);
+  --sans: Inter, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --bg: #0a0b0c; --fg: #f2f4f5; --mute: #8e959a; --faint: #5b6166;
+  --card: #16181a; --tile: #222425; --tile-on: #343638; --line: #26282a;
+  --ice: #64d2ff; --on-ice: #0b0c0d; --green: #30d158; --red: #ff453a;
+  --fs-display: 64px; --fs-hero: 48px; --fs-title: 32px; --fs-item: 26px; --fs-body: 24px; --fs-label: 22px;
+  --r-card: 32px; --r-tile: 26px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; }
+body { font: 400 var(--fs-body)/1.3 var(--sans); letter-spacing: -.02em; color: var(--fg); font-variant-numeric: tabular-nums; outline: none; -webkit-font-smoothing: antialiased; }
+#stage { width: 1920px; height: 1080px; transform-origin: 0 0; position: absolute; top: 0; left: 0; }
+.mute { color: var(--mute); }
+svg { stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- header ---------- */
+.head { position: absolute; left: 120px; right: 120px; top: 56px; display: flex; align-items: baseline; justify-content: space-between; }
+.head .time { font-size: var(--fs-display); line-height: 1; }
+.head .date { margin-left: 22px; }
+.head .status { display: flex; align-items: center; color: var(--mute); }
+.head .status svg { width: 30px; height: 30px; margin-right: 10px; }
+.pill { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 999px; font-size: var(--fs-label); background: var(--tile); color: var(--mute); white-space: nowrap; }
+.pill.ok { background: #16301f; color: var(--green); }
+.pill.bad { background: #3b1f1f; color: var(--red); margin-left: 18px; }
+.pill[hidden] { display: none; }
+
+/* ---------- views ---------- */
+.view { position: absolute; left: 120px; right: 120px; top: 168px; bottom: 150px; opacity: 0; visibility: hidden; transition: opacity .25s var(--ease-out), visibility 0s .25s; }
+.view.on { opacity: 1; visibility: visible; transition: opacity .25s var(--ease-out); }
+
+/* home: the hero is whatever app you're on; your apps sit under it */
+.hero { display: flex; align-items: center; height: 400px; }
+.art { position: relative; width: 820px; height: 400px; flex: none; border-radius: var(--r-card); overflow: hidden; background: var(--card); }
+.art .ph { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; transition: opacity 1.2s ease; }
+.art .veil { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10,11,12,.38); }
+.art .logo { position: absolute; left: 50%; top: 50%; width: 168px; height: 168px; margin: -84px 0 0 -84px; border-radius: 40px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.5); transition: transform .35s var(--ease-out); }
+.art .logo img, .art .logo .mono { width: 100%; height: 100%; display: block; }
+.art .logo.swap { transform: scale(.94); }
+.copy { margin-left: 64px; }
+.copy .when { color: var(--mute); }
+.copy h1 { font-weight: 400; font-size: var(--fs-hero); line-height: 1.15; margin-top: 10px; letter-spacing: -.02em; }
+.copy .sub { color: var(--mute); margin-top: 10px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 80px; min-width: 280px; padding: 0 40px; margin-top: 40px; border-radius: 999px; background: var(--ice); color: var(--on-ice); font-size: var(--fs-item); transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-out); }
+.btn.f-on { transform: scale(1.04); box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--fg); }
+
+.label { color: var(--mute); margin: 40px 0 16px 4px; }
+.row { display: flex; }
+.app { width: 300px; margin-right: 24px; flex: none; }
+.app .t { height: 160px; border-radius: var(--r-tile); background: var(--tile); display: flex; align-items: center; justify-content: center; color: var(--fg);
+  transition: transform .22s var(--ease-out), background-color .22s var(--ease-out), box-shadow .22s var(--ease-out); }
+.app .t img, .app .t .mono { width: 92px; height: 92px; border-radius: 22px; }
+.app .t svg { width: 56px; height: 56px; }
+.app .n { margin: 16px 4px 0; font-size: var(--fs-item); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app .s { margin: 4px 4px 0; color: var(--mute); font-size: var(--fs-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app.f-on .t { transform: scale(1.05); background: var(--tile-on); box-shadow: 0 0 0 3px rgba(100,210,255,.75); }
+.mono { display: flex; align-items: center; justify-content: center; background: #2d2f31; color: var(--fg); font-size: 34px; }
+
+/* all apps */
+.title { display: flex; align-items: baseline; }
+.title h2 { font-weight: 400; font-size: var(--fs-title); }
+.title .mute { margin-left: 16px; }
+.scroller { position: absolute; top: 76px; left: -16px; right: -16px; bottom: 0; overflow: hidden; }
+.grid { position: absolute; top: 0; left: 16px; right: 16px; padding-top: 12px; display: flex; flex-wrap: wrap; transition: transform .35s var(--ease-out); }
+.grid .app { width: 258px; margin: 0 26px 30px 0; }
+.grid .app:nth-child(6n) { margin-right: 0; }
+.grid .app .t { height: 150px; }
+.grid .app .t img, .grid .app .t .mono { width: 80px; height: 80px; border-radius: 20px; }
+.grid .app .n { font-size: var(--fs-body); margin-top: 12px; }
+
+/* inputs: separate tiles, spacing divides them, never a line */
+.rows { margin-top: 36px; width: 1000px; }
+.r { display: flex; align-items: center; min-height: 104px; padding: 0 28px; margin-bottom: 14px; border-radius: var(--r-tile); background: var(--tile);
+  transition: transform .22s var(--ease-out), background-color .22s var(--ease-out), box-shadow .22s var(--ease-out); }
+.r svg { width: 36px; height: 36px; flex: none; }
+.r .rl { margin-left: 24px; flex: 1; }
+.r .rl div { font-size: var(--fs-item); }
+.r .rl small { display: block; font-size: var(--fs-label); color: var(--mute); margin-top: 2px; }
+.r.f-on { transform: scale(1.02); background: var(--tile-on); box-shadow: 0 0 0 3px rgba(100,210,255,.75); }
+
+/* ---------- dock ---------- */
+.dock { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); display: flex; align-items: center; padding: 10px; border-radius: 34px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(0,0,0,.35); }
+.dock .b { width: 76px; height: 76px; border-radius: 24px; display: flex; align-items: center; justify-content: center; color: var(--mute); margin: 0 2px; transition: background-color .2s, color .2s, box-shadow .2s var(--ease-out); }
+.dock .b svg { width: 32px; height: 32px; }
+.dock .b.cur { background: #323435; color: var(--fg); }
+.dock .b.f-on { color: var(--fg); box-shadow: 0 0 0 3px rgba(100,210,255,.75); }
+.dock .sep { width: 1px; height: 40px; margin: 0 10px; background: var(--line); }
+
+/* ---------- ambient ---------- */
+#ambient { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; background: #000; opacity: 0; visibility: hidden; transition: opacity .6s ease, visibility 0s .6s; }
+#ambient.on { opacity: 1; visibility: visible; transition: opacity .6s ease; }
+#ambient .ph { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; transition: opacity 1.2s ease; }
+#ambient .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 460px; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.6)); }
+#ambient .clk { position: absolute; left: 120px; bottom: 100px; }
+#ambient .clk .big { font-size: 168px; line-height: 1; letter-spacing: -.03em; }
+#ambient .clk .mute { color: rgba(242,244,245,.7); margin-top: 14px; font-size: var(--fs-item); }
+#ambient .credit { position: absolute; right: 120px; bottom: 108px; text-align: right; color: rgba(242,244,245,.7); font-size: var(--fs-label); }
+#ambient .credit div { color: var(--fg); font-size: var(--fs-body); margin-bottom: 4px; }
+
+/* ---------- toast: DeFleet's tooltip bubble ---------- */
+#toast { position: absolute; left: 50%; bottom: 160px; transform: translateX(-50%) scale(.97); display: flex; align-items: center; height: 60px; padding: 0 24px; border-radius: 20px; background: #1c1d1f; border: 1px solid #292a2c; font-size: var(--fs-body); white-space: nowrap; opacity: 0; transition: opacity .15s var(--ease-out), transform .15s var(--ease-out); }
+#toast.on { opacity: 1; transform: translateX(-50%) scale(1); }
+#toast.err { color: var(--red); }
+</style>
+</head>
+<body tabindex="-1">
+<div id="stage">
+
+  <div class="head">
+    <div><span class="time" id="time">--:--</span><span class="date mute" id="date"></span></div>
+    <div class="status">
+      <svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg><span id="vol">--</span>
+      <span class="pill bad" id="offline" hidden>Offline</span>
+    </div>
+  </div>
+
+  <!-- home -->
+  <section class="view on" id="v-home">
+    <div class="hero">
+      <div class="art">
+        <div class="ph" id="art-a"></div><div class="ph" id="art-b" style="opacity:0"></div>
+        <div class="veil"></div>
+        <div class="logo" id="hero-logo"></div>
+      </div>
+      <div class="copy">
+        <div class="when" id="hero-when">Tonight</div>
+        <h1 id="hero-name">YouTube</h1>
+        <div class="sub" id="hero-sub">Not opened yet</div>
+        <div class="btn f" id="hero-open" data-act="open">Open</div>
+      </div>
+    </div>
+    <div class="label">Your apps</div>
+    <div class="row" id="home-row"></div>
+  </section>
+
+  <!-- all apps -->
+  <section class="view" id="v-apps">
+    <div class="title"><h2>All apps</h2><span class="mute" id="apps-count"></span></div>
+    <div class="scroller"><div class="grid" id="apps-grid"></div></div>
+  </section>
+
+  <!-- inputs -->
+  <section class="view" id="v-inputs">
+    <div class="title"><h2>Inputs</h2><span class="mute" id="inputs-count"></span></div>
+    <div class="rows" id="inputs"></div>
+  </section>
+
+  <div class="dock">
+    <div class="b f cur" data-act="view" data-view="home"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg></div>
+    <div class="b f" data-act="view" data-view="apps"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg></div>
+    <div class="b f" data-act="view" data-view="inputs"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 20h6"/></svg></div>
+    <span class="sep"></span>
+    <div class="b f" data-act="ambient"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="m4 16 4.5-4.5 4 4 2.5-2.5 5 5"/><circle cx="15.5" cy="9" r="1.5"/></svg></div>
+    <div class="b f" data-act="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></div>
+  </div>
+
+  <div id="ambient">
+    <div class="ph" id="am-a"></div><div class="ph" id="am-b" style="opacity:0"></div>
+    <div class="shade"></div>
+    <div class="clk"><div class="big" id="am-time"></div><div class="mute" id="am-date"></div></div>
+    <div class="credit"><div id="am-title"></div><span id="am-by"></span></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var WALLS = [
+    ['01.jpg', 'Aoraki / Mount Cook', 'Michal Klajban'], ['02.jpg', 'Three Sisters, Canmore', 'Jakub Fryš'],
+    ['03.jpg', 'Llyn Ogwen, Milky Way', 'John Badham'], ['04.jpg', 'Aurora borealis, Estonia', 'Kristian Pikner'],
+    ['05.jpg', 'Lake Mystery, Canterbury', 'Michal Klajban'], ['06.jpg', 'Soltan salt lake, Iran', 'Amir Pashaei'],
+    ['07.jpg', 'Sossusvlei, Namibia', 'Diego Delso'], ['08.jpg', 'Sossusvlei dunes, Namibia', 'Diego Delso'],
+    ['09.jpg', 'Geirangerfjord, Norway', 'Ximonic (Simo Räsänen)'], ['10.jpg', 'Lago do Cuniã, Brazil', 'RodrigoErse'],
+    ['11.jpg', 'Tschierva glacier, Switzerland', 'Daniel Schwen'], ['12.jpg', 'View from Herzogenhorn', 'Jörg Braukmann'],
+    ['13.jpg', 'Westruper Heide, Haltern', 'Dietmar Rabich'], ['14.jpg', 'Volcán Pacaya, Guatemala', 'Christopher Crouzet']
+  ];
+  var ROTATE_MS = 120000;
+  var SVG = {
+    globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z"/></svg>',
+    grid: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg>',
+    tv: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 20h6"/></svg>',
+    antenna: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="2"/><path d="m8 3 4 5 4-5"/></svg>'
+  };
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var icons = {}, home = [], all = [], sources = [], view = 'home', focused = null, heroApp = null, ambient = false;
+  var wall = 0, wallAt = Date.now(), flip = false;
+
+  function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var opened = load('opened') || {};
+
+  // ---------- server ----------
+  function api(path, done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', path, true); x.timeout = 15000;
+    x.onload = function () { var r = null; try { r = JSON.parse(x.responseText); } catch (e) {} if (path.charAt(1) === 'a') $('offline').hidden = !!r && !r.offline; if (done) done(r); };
+    x.onerror = x.ontimeout = function () { $('offline').hidden = false; if (done) done(null); };
+    x.send();
+  }
+
+  // ---------- words ----------
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function clean(n) { return String(n).replace(/[▶︎]/g, '').replace(/\s*[:.]\s*$/, '').replace(/\s*:\s.*$/, '').trim(); }
+  function nice(n) { var c = clean(n); return c === 'TV Browser' ? 'Browser' : c; }
+  function inputName(n) { return clean(n).replace(/^HDMI(\d)/i, 'HDMI $1'); }
+  function hm(d) { var h = d.getHours() % 12 || 12; return h + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function partOfDay(d) { var h = d.getHours(); return h < 5 ? 'Tonight' : h < 12 ? 'This morning' : h < 17 ? 'This afternoon' : h < 21 ? 'This evening' : 'Tonight'; }
+  function ago(t) {
+    if (!t) return 'Not opened yet';
+    var d = new Date(t), now = new Date(), mins = (now - d) / 60000;
+    var day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (mins < 2) return 'Opened just now';
+    if (t >= day0) return 'Opened today at ' + hm(d) + (d.getHours() < 12 ? ' am' : ' pm');
+    if (t >= day0 - 86400000) return 'Opened yesterday';
+    if (t >= day0 - 6 * 86400000) return 'Opened ' + DAYS[d.getDay()];
+    return 'Opened ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate();
+  }
+  function when(t) {   // a tile's quiet second line: "Today at 9:14 pm", "Yesterday", or nothing
+    if (!t) return '';
+    var s = ago(t).replace(/^Opened /, '');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function art(name) {
+    var key = clean(name).toLowerCase();
+    if (icons[key]) return '<img src="icons/' + icons[key] + '.png" alt="">';
+    if (key === 'tv browser') return SVG.globe;
+    var w = nice(name).split(/\s+/);
+    return '<div class="mono">' + esc((w[0].charAt(0) + (w[1] ? w[1].charAt(0) : '')).toUpperCase()) + '</div>';
+  }
+
+  // ---------- render ----------
+  function appTile(name, cls) {
+    return '<div class="app f" data-act="app" data-name="' + esc(name) + '"><div class="t">' + art(name) + '</div>' +
+      '<div class="n">' + esc(nice(name)) + '</div>' + (cls === 'home' ? '<div class="s">' + esc(when(opened[clean(name)])) + '&nbsp;</div>' : '') + '</div>';
+  }
+  function renderHome() {
+    var keep = focused && $('home-row').contains(focused) && focused.getAttribute('data-name');
+    $('home-row').innerHTML = home.slice(0, 4).map(function (n) { return appTile(n, 'home'); }).join('') +
+      '<div class="app f" data-act="view" data-view="apps"><div class="t">' + SVG.grid + '</div><div class="n">All apps</div><div class="s">' + (all.length || '') + '</div></div>';
+    if (!heroApp && home.length) setHero(home[0]);
+    if (keep) refocus($('home-row').querySelector('[data-name="' + keep + '"]'));
+    else if (!focused) focus($('home-row').querySelector('.f'));
+  }
+  function renderApps() {
+    $('apps-grid').innerHTML = all.map(function (n) { return appTile(n); }).join('');
+    $('apps-count').textContent = all.length ? String(all.length) : '';
+  }
+  function renderInputs() {
+    var list = sources.filter(function (s) { return /^(tv|hdmi|av)/i.test(s.id); });
+    var keep = focused && $('inputs').contains(focused) && focused.getAttribute('data-id');
+    $('inputs').innerHTML = list.map(function (s) {
+      var tv = /^tv$/i.test(s.id);
+      return '<div class="r f" data-act="source" data-id="' + esc(s.id) + '">' + (tv ? SVG.antenna : SVG.tv) +
+        '<div class="rl"><div>' + esc(inputName(s.name)) + '</div><small>' + (tv ? 'Antenna and cable' : s.signal ? 'Something is playing' : 'Nothing connected') + '</small></div>' +
+        (s.signal ? '<span class="pill ok">Connected</span>' : '') + '</div>';
+    }).join('');
+    $('inputs-count').textContent = String(list.length);
+    if (keep) refocus($('inputs').querySelector('[data-id="' + keep + '"]'));
+  }
+  function setHero(name) {
+    if (heroApp === name) return;
+    heroApp = name;
+    var logo = $('hero-logo');
+    logo.className = 'logo swap'; logo.innerHTML = art(name);
+    setTimeout(function () { logo.className = 'logo'; }, 30);
+    $('hero-name').textContent = nice(name);
+    $('hero-sub').textContent = ago(opened[clean(name)]);
+  }
+
+  // ---------- views ----------
+  function show(v, focusFirst) {
+    view = v;
+    ['home', 'apps', 'inputs'].forEach(function (k) { $('v-' + k).className = 'view' + (k === v ? ' on' : ''); });
+    var dock = document.querySelectorAll('.dock .b');
+    for (var i = 0; i < dock.length; i++) dock[i].classList.toggle('cur', dock[i].getAttribute('data-view') === v);
+    if (v === 'apps') { scrollTo(0); }
+    if (focusFirst) {
+      var first = v === 'home' ? $('home-row').querySelector('.f') : v === 'apps' ? $('apps-grid').querySelector('.f') : $('inputs').querySelector('.f');
+      focus(first);
+    }
+  }
+  function setAmbient(on) { ambient = on; $('ambient').className = on ? 'on' : ''; }
+
+  // ---------- wallpaper ----------
+  function showWall(i) {
+    wall = (i + WALLS.length) % WALLS.length; wallAt = Date.now(); save('wall', wall);
+    var url = 'url(bg/1080s/' + WALLS[wall][0] + ')';
+    var a = flip ? $('art-a') : $('art-b'), b = flip ? $('art-b') : $('art-a');
+    var c = flip ? $('am-a') : $('am-b'), d = flip ? $('am-b') : $('am-a');
+    a.style.backgroundImage = url; c.style.backgroundImage = url;
+    a.style.opacity = 1; b.style.opacity = 0; c.style.opacity = 1; d.style.opacity = 0;
+    flip = !flip;
+    $('am-title').textContent = WALLS[wall][1];
+    $('am-by').textContent = 'Photo by ' + WALLS[wall][2];
+  }
+
+  // ---------- clock ----------
+  function tick() {
+    var d = new Date();
+    $('time').textContent = hm(d); $('am-time').textContent = hm(d);
+    var date = DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+    $('date').textContent = date; $('am-date').textContent = date;
+    $('hero-when').textContent = partOfDay(d);
+    if (Date.now() - wallAt > ROTATE_MS) showWall(wall + 1);
+  }
+
+  // ---------- focus ----------
+  function focus(el) {
+    if (!el) return;
+    if (focused) focused.classList.remove('f-on');
+    focused = el; el.classList.add('f-on');
+    if (el.getAttribute('data-act') === 'app' && view === 'home') setHero(el.getAttribute('data-name'));
+    if (view === 'apps' && $('apps-grid').contains(el)) scrollTo(el);
+  }
+  function refocus(el) { focused = null; focus(el); }
+  function pool() {
+    var list = [], v = $('v-' + view).querySelectorAll('.f'), d = document.querySelectorAll('.dock .f');
+    for (var i = 0; i < v.length; i++) list.push(v[i]);
+    for (var j = 0; j < d.length; j++) list.push(d[j]);
+    return list;
+  }
+  function move(dx, dy) {
+    if (!focused || !document.body.contains(focused)) return focus(pool()[0]);
+    var a = focused.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    var best = null, score = Infinity, list = pool();
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]; if (el === focused) continue;
+      var b = el.getBoundingClientRect(); if (!b.width) continue;
+      var bx = b.left + b.width / 2, by = b.top + b.height / 2;
+      var past = dx ? (dx > 0 ? b.left >= a.right - 6 : b.right <= a.left + 6) : (dy > 0 ? b.top >= a.bottom - 6 : b.bottom <= a.top + 6);
+      if (!past) continue;
+      var along = dx ? (bx - ax) * dx : (by - ay) * dy;
+      var across = dx ? Math.abs(by - ay) : Math.abs(bx - ax);
+      var overlap = dx ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      var s = along + across * 2 - (overlap > 0 ? 600 : 0);
+      if (s < score) { score = s; best = el; }
+    }
+    if (best) focus(best);
+  }
+  function scrollTo(el) {
+    var grid = $('apps-grid'), box = grid.parentNode;
+    if (!el) { grid.style.transform = 'translateY(0)'; grid.setAttribute('data-y', '0'); return; }
+    var y = +grid.getAttribute('data-y') || 0, top = el.offsetTop, h = el.offsetHeight + 30, view = box.clientHeight;
+    if (top - 12 < y) y = Math.max(0, top - 12); else if (top + h > y + view) y = top + h - view;
+    grid.setAttribute('data-y', String(y));
+    grid.style.transform = 'translateY(' + (-y) + 'px)';
+  }
+
+  // ---------- actions ----------
+  var toastTimer;
+  function toast(msg, err) {
+    var t = $('toast'); t.textContent = msg; t.className = 'on' + (err ? ' err' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = err ? 'err' : ''; }, 2200);
+  }
+  function openApp(name) {
+    toast('Opening ' + nice(name));
+    opened[clean(name)] = Date.now(); save('opened', opened);
+    api('/api/launch?name=' + encodeURIComponent(name), function (r) {
+      if (!r || !r.ok) toast('Couldn’t open ' + nice(name), true);
+      $('hero-sub').textContent = ago(opened[clean(heroApp || name)]);
+      renderHome();
+    });
+  }
+  function activate() {
+    var el = focused; if (!el) return;
+    var act = el.getAttribute('data-act');
+    if (act === 'app') openApp(el.getAttribute('data-name'));
+    else if (act === 'open' && heroApp) openApp(heroApp);
+    else if (act === 'view') show(el.getAttribute('data-view'), !el.classList.contains('b'));
+    else if (act === 'ambient') setAmbient(true);
+    else if (act === 'settings') api('/api/key?k=KEY_MENU');
+    else if (act === 'source') {
+      var s = sources.filter(function (x) { return x.id === el.getAttribute('data-id'); })[0];
+      toast('Switching to ' + inputName(s ? s.name : el.getAttribute('data-id')));
+      api('/api/source?id=' + encodeURIComponent(el.getAttribute('data-id')), function (r) { if (!r || !r.ok) toast('Couldn’t switch input', true); });
+    }
+  }
+  function back() {
+    if (view !== 'home') { show('home', true); return; }
+    focus($('home-row').querySelector('.f'));
+  }
+
+  function keyName(e) {
+    var alias = { Left: 'ArrowLeft', Right: 'ArrowRight', Up: 'ArrowUp', Down: 'ArrowDown', Select: 'Enter', OK: 'Enter', Accept: 'Enter', GoBack: 'Escape', Back: 'Escape', BrowserBack: 'Escape' };
+    if (alias[e.key]) return alias[e.key];
+    switch (e.keyCode || e.which) {
+      case 37: return 'ArrowLeft'; case 38: return 'ArrowUp'; case 39: return 'ArrowRight'; case 40: return 'ArrowDown';
+      case 13: case 23: case 66: return 'Enter';
+      case 27: case 8: case 461: case 10009: return 'Escape';
+    }
+    return e.key;
+  }
+  window.addEventListener('keydown', function (e) {
+    var k = keyName(e);
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape'].indexOf(k) < 0) return;
+    e.preventDefault();
+    if (ambient) { setAmbient(false); return; }
+    if (k === 'ArrowLeft') move(-1, 0);
+    else if (k === 'ArrowRight') move(1, 0);
+    else if (k === 'ArrowUp') move(0, -1);
+    else if (k === 'ArrowDown') move(0, 1);
+    else if (k === 'Escape') back();
+    else if (!e.repeat) activate();
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (ambient) { setAmbient(false); return; }
+    var el = e.target; while (el && el !== document && !(el.classList && el.classList.contains('f'))) el = el.parentNode;
+    if (el && el.classList) { focus(el); activate(); }
+  });
+
+  // ---------- data ----------
+  function loadVolume() { api('/api/volume', function (r) { if (r && r.ok && r.data && r.data.volume_value != null) $('vol').textContent = r.data.muted ? 'Muted' : String(r.data.volume_value); }); }
+  function loadSources() { api('/api/sources', function (r) { if (r && r.ok && r.data) { sources = r.data; renderInputs(); } }); }
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080), st = $('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+  showWall(+(load('wall') || 0));
+  tick(); setInterval(tick, 1000);
+  api('icons/index.json', function (r) {
+    if (r) icons = r;
+    api('/api/apps', function (r) { if (r && r.ok && r.data) { home = r.data; renderHome(); } });
+    api('/api/apps?all=1', function (r) { if (r && r.ok && r.data) { all = r.data; renderApps(); renderHome(); } });
+  });
+  loadSources(); setInterval(loadSources, 30000);
+  loadVolume(); setInterval(loadVolume, 5000);
+  document.body.focus();
+})();
+</script>
+</body>
+</html>

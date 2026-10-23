@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Space mockup</title>
+<style>
+@font-face { font-family: Inter; src: url(fonts/Inter-Regular.woff2) format("woff2"); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #05070a; font-family: Inter, sans-serif; letter-spacing: -.02em; color: #f2f4f5; }
+#stage { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; overflow: hidden;
+  background: radial-gradient(ellipse 70% 60% at 50% 46%, #101a2a 0%, #070a10 55%, #030406 100%); }
+.world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; perspective: 1400px; perspective-origin: 0 0; }
+.plane { position: absolute; transform-style: preserve-3d; transform: rotateX(14deg) rotateY(-10deg); }
+.card { position: absolute; width: 300px; height: 190px; margin: -95px 0 0 -150px; border-radius: 26px; overflow: hidden;
+  background: linear-gradient(160deg, #1c2533, #11161f); border: 1px solid rgba(255,255,255,.07); box-shadow: 0 30px 60px rgba(0,0,0,.45); }
+.card .ic { position: absolute; left: 24px; top: 24px; width: 64px; height: 64px; border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #2a3342; font-size: 24px; }
+.card .ic img { width: 100%; height: 100%; }
+.card .nm { position: absolute; left: 24px; bottom: 22px; font-size: 26px; }
+.card .sb { position: absolute; left: 24px; top: 100px; font-size: 18px; color: rgba(255,255,255,.7); }
+.card.hot { background: linear-gradient(160deg, var(--c1), var(--c2)); }
+.card.focus { box-shadow: 0 0 0 4px #64d2ff, 0 0 80px rgba(100,210,255,.35), 0 50px 90px rgba(0,0,0,.6); }
+.hud { position: absolute; z-index: 5; }
+.time { left: 96px; top: 64px; font-size: 60px; line-height: 1; }
+.date { left: 96px; top: 136px; font-size: 24px; color: #8e959a; }
+.where { right: 96px; top: 74px; font-size: 24px; color: #8e959a; text-align: right; }
+.where b { font-weight: 400; color: #f2f4f5; }
+.shade { left: 0; right: 0; bottom: 0; height: 300px; background: linear-gradient(180deg, rgba(3,4,6,0), rgba(3,4,6,.92) 60%); }
+.title { left: 50%; bottom: 110px; transform: translateX(-50%); text-align: center; }
+.title .n { font-size: 46px; }
+.title .s { font-size: 24px; color: #8e959a; margin-top: 8px; }
+.hint { left: 50%; bottom: 52px; transform: translateX(-50%); font-size: 20px; color: #5b6166; white-space: nowrap; }
+.mini { right: 96px; bottom: 56px; width: 150px; height: 96px; border-radius: 14px; border: 1px solid #26282a; background: rgba(10,12,16,.7); }
+.mini i { position: absolute; width: 10px; height: 7px; border-radius: 2px; background: #2d3540; }
+.mini i.on { background: #64d2ff; }
+.tag { position: absolute; left: 96px; bottom: 56px; padding: 10px 18px; border-radius: 999px; background: rgba(100,210,255,.12); color: #64d2ff; font-size: 20px; }
+/* frame B: selection */
+.streak { position: absolute; left: 50%; top: 50%; width: 2px; transform-origin: 0 0; background: linear-gradient(180deg, rgba(100,210,255,0), rgba(100,210,255,.55)); }
+.blur .plane .card:not(.focus) { filter: blur(6px); opacity: .45; }
+.hero { position: absolute; left: 50%; top: 50%; width: 1100px; height: 640px; margin: -330px 0 0 -550px; border-radius: 48px; overflow: hidden; z-index: 4;
+  background: linear-gradient(150deg, #ff2a4a, #b00020 70%); box-shadow: 0 0 0 4px #64d2ff, 0 0 160px rgba(255,40,70,.45), 0 80px 160px rgba(0,0,0,.7); }
+.hero .ic { position: absolute; left: 64px; top: 64px; width: 150px; height: 150px; border-radius: 36px; overflow: hidden; }
+.hero .ic img { width: 100%; height: 100%; }
+.hero .nm { position: absolute; left: 64px; bottom: 120px; font-size: 96px; line-height: 1; }
+.hero .sb { position: absolute; left: 64px; bottom: 64px; font-size: 30px; color: rgba(255,255,255,.75); }
+.hero .ring { position: absolute; right: -160px; top: -160px; width: 620px; height: 620px; border-radius: 50%; border: 60px solid rgba(255,255,255,.12); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+(function () {
+  var frame = /frame=b/.test(location.search) ? 'b' : 'a';
+  var APPS = [
+    ['YouTube', 'youtube', '#ff2a4a', '#b00020'], ['Netflix', 'netflix', '#2b0a0d', '#e50914'], ['Prime Video', 'prime-video', '#1aa3ff', '#0b4f8a'],
+    ['DStv Now', 'dstv-now', '#1d5fff', '#0a2a8a'], ['Spotify', '', '#1ed760', '#0b6b30'], ['UEFA.tv', 'uefatv', '#0c2a7a', '#071640'],
+    ['DAZN', 'dazn', '#222', '#000'], ['Red Bull TV', 'red-bull-tv', '#0d1b3d', '#d0112b'], ['Deezer', 'deezer', '#a238ff', '#3b0a7a'],
+    ['NBA', 'nba', '#1d428a', '#c8102e'], ['MUBI', 'mubi', '#111', '#333'], ['UFC', 'ufc', '#d20a0a', '#3a0000'],
+    ['StarTimes ON', 'startimes-on', '#ff8a00', '#c43d00'], ['Stremio', '', '#7b5bf5', '#2c1a7a'], ['Browser', '', '#2a6cf5', '#0f2d6e'],
+    ['Plex', 'plex', '#e5a00d', '#5a3d00'], ['App Store', 'app-store', '#3a8bff', '#173d8a'], ['Kidoodle TV', '', '#ff5ea8', '#8a1450']
+  ];
+  var stage = document.getElementById('stage');
+  var html = '<div class="world"><div class="plane">';
+  var cols = 9, rows = 7, gx = 360, gy = 240, k = 0, fx = 0, fy = 0;
+  for (var r = -3; r <= 3; r++) for (var c = -4; c <= 4; c++) {
+    var a = APPS[(k++ * 7 + 3) % APPS.length], focus = r === 0 && c === 0;
+    if (focus) a = APPS[0];
+    var dist = Math.sqrt(c * c * 0.6 + r * r);
+    var z = focus ? 140 : -dist * 120 + (Math.sin(c * 1.7 + r * 2.3) * 60);
+    var op = Math.max(0.08, 1 - dist * 0.2);
+    var hot = focus || (dist < 2.2 && (c + r) % 2 === 0);
+    var ic = a[1] ? '<img src="icons/' + a[1] + '.png">' : a[0].charAt(0);
+    html += '<div class="card' + (hot ? ' hot' : '') + (focus ? ' focus' : '') + '" style="--c1:' + a[2] + ';--c2:' + a[3] + ';left:' + (c * gx) + 'px;top:' + (r * gy) + 'px;' +
+      'transform:translateZ(' + z + 'px)' + (focus ? ' scale(1.12)' : '') + ';opacity:' + op + '"><div class="ic">' + ic + '</div><div class="nm">' + a[0] + '</div><div class="sb">' + (focus ? 'Opened yesterday' : '') + '</div></div>';
+  }
+  html += '</div></div>';
+  html += '<div class="hud time">12:58</div><div class="hud date">Friday, 23 October</div>' +
+    '<div class="hud where"><b>All apps</b> · 38 cards<br>Inputs live · 0</div>';
+  if (frame === 'a') {
+    html += '<div class="hud shade"></div><div class="hud title"><div class="n">YouTube</div><div class="s">OK to open · arrows to fly</div></div>' +
+      '<div class="hud hint">The field goes on in every direction — arrows glide the camera from card to card</div>';
+    var mini = '<div class="hud mini">';
+    for (var y = 0; y < 6; y++) for (var x = 0; x < 9; x++) mini += '<i class="' + (x === 4 && y === 3 ? 'on' : '') + '" style="left:' + (12 + x * 14) + 'px;top:' + (10 + y * 13) + 'px"></i>';
+    html += mini + '</div><div class="tag">Frame A · browsing</div>';
+  } else {
+    stage.className = 'blur';
+    for (var i = 0; i < 48; i++) {
+      var ang = i / 48 * 360, len = 220 + (i * 37 % 160);
+      html += '<div class="streak" style="height:' + len + 'px;transform:rotate(' + ang + 'deg) translateY(' + (360 + (i * 53 % 220)) + 'px)"></div>';
+    }
+    html += '<div class="hero"><div class="ring"></div><div class="ic"><img src="icons/youtube.png"></div><div class="nm">YouTube</div><div class="sb">Opening…</div></div>' +
+      '<div class="tag">Frame B · selecting — the card flies to you, the field scatters into light</div>';
+  }
+  stage.innerHTML = html;
+})();
+</script>
+</body>
+</html>

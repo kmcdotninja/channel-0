@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Widgets</title>
+<style>
+/* Design 3: watch-style complications on pure black. Every widget is a bold figure, one coloured status word and a
+   small live visualisation; widgets you can act on light up with a soft ring when the remote lands on them. */
+@font-face { font-family: Tight; src: url(fonts/InterTight-500.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: Tight; src: url(fonts/InterTight-700.woff2) format("woff2"); font-weight: 700; }
+:root {
+  --fg: #ffffff; --mute: #8e8e93; --dim: #3a3a3c; --well: #1c1c1e;
+  --green: #30d158; --yellow: #ffd60a; --orange: #ff9f0a; --red: #ff453a; --pink: #ff375f;
+  --violet: #8e7dff; --cyan: #64d2ff; --teal: #40e0d0; --lime: #b4f03c;
+  --ease: cubic-bezier(.23,1,.32,1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+body { font-family: Tight, -apple-system, "Helvetica Neue", Arial, sans-serif; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; letter-spacing: -.01em; outline: none; -webkit-font-smoothing: antialiased; }
+#stage { width: 1920px; height: 1080px; transform-origin: 0 0; position: absolute; top: 0; left: 0; background: #000; }
+svg { display: block; overflow: visible; }
+
+.grid { position: absolute; left: 74px; top: 70px; display: grid; grid-template-columns: repeat(4, 404px); grid-template-rows: repeat(3, 284px); grid-gap: 44px 52px; }
+.w { position: relative; border-radius: 40px; padding: 26px 28px; transition: transform .25s var(--ease), background-color .25s var(--ease), box-shadow .25s var(--ease); }
+.w.f.on { background: #121214; box-shadow: 0 0 0 3px rgba(255,255,255,.9); transform: scale(1.03); }
+
+.top { display: flex; justify-content: space-between; align-items: baseline; height: 30px; }
+.lbl { font-weight: 500; font-size: 22px; color: var(--mute); text-transform: uppercase; letter-spacing: .01em; white-space: nowrap; }
+.word { font-size: 24px; text-transform: uppercase; white-space: nowrap; }
+.big { font-size: 58px; line-height: 1; letter-spacing: -.02em; white-space: nowrap; }
+.big small { font-size: .52em; letter-spacing: 0; margin-left: 2px; }
+.sub { font-weight: 500; font-size: 24px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub b { color: var(--fg); font-weight: 700; }
+.ticks { display: flex; justify-content: space-between; font-weight: 500; font-size: 19px; color: var(--mute); margin-top: 8px; }
+
+/* time */
+.time .big { font-size: 112px; letter-spacing: -.03em; margin-top: 14px; }
+.time .big small { font-size: 34px; color: var(--mute); margin-left: 8px; }
+.cap { position: relative; height: 34px; border-radius: 17px; background: var(--well); margin-top: 22px; overflow: hidden; }
+.cap i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 17px; }
+.cap b { position: absolute; top: 3px; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: #fff; box-shadow: 0 0 12px rgba(255,255,255,.5); }
+
+/* apps */
+.app .head { display: flex; align-items: center; }
+.app .head img, .app .head .mono, .app .head .gl { width: 44px; height: 44px; border-radius: 12px; flex: none; margin-right: 14px; }
+.app .head .gl { display: flex; align-items: center; justify-content: center; background: #0e2a33; color: var(--cyan); }
+.app .head .name { font-size: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.app .head .go { font-size: 20px; padding: 4px 12px; border-radius: 10px; color: #000; }
+.app .big { margin-top: 14px; font-size: 50px; }
+.app .sub { margin-top: 4px; font-size: 22px; }
+.bars { display: flex; align-items: flex-end; height: 64px; margin-top: 12px; }
+.bars .c { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.bars .c i { display: block; width: 22px; border-radius: 11px; background: var(--dim); }
+.bars .c span { font-weight: 500; font-size: 17px; color: var(--mute); margin-top: 6px; }
+.bars .c.today span { color: var(--fg); }
+
+.mono { display: flex; align-items: center; justify-content: center; background: #2c2c2e; color: #fff; font-size: 20px; }
+
+/* volume */
+.steps { display: flex; align-items: flex-end; height: 92px; margin-top: 16px; position: relative; }
+.steps i { flex: 1; margin-right: 6px; border-radius: 8px 8px 4px 4px; }
+.steps i:last-child { margin-right: 0; }
+.steps .mark { position: absolute; bottom: -6px; width: 6px; margin-left: -3px; border-radius: 3px; background: #fff; box-shadow: 0 0 14px #fff, 0 0 4px #ff375f; transition: left .4s var(--ease), height .4s var(--ease); }
+
+/* inputs */
+.ins { display: flex; justify-content: space-between; margin-top: 18px; }
+.ins .c { display: flex; flex-direction: column; align-items: center; width: 62px; }
+.ins .c .dots i { display: block; width: 18px; height: 18px; border-radius: 50%; margin: 0 auto 7px; background: var(--dim); }
+.ins .c.live .dots i { background: var(--green); box-shadow: 0 0 10px rgba(48,209,88,.6); }
+.ins .c span { font-weight: 500; font-size: 18px; color: var(--mute); white-space: nowrap; }
+.ins .c.live span { color: var(--fg); }
+
+/* photo */
+.ph { height: 138px; border-radius: 22px; margin-top: 12px; background-size: cover; background-position: center; position: relative; overflow: hidden; }
+.ph .prog { position: absolute; left: 14px; right: 14px; bottom: 12px; height: 6px; border-radius: 3px; background: rgba(0,0,0,.45); }
+.ph .prog i { display: block; height: 6px; border-radius: 3px; background: #fff; }
+
+/* all apps */
+.mini { display: grid; grid-template-columns: repeat(6, 48px); grid-gap: 12px 10px; margin-top: 18px; }
+.mini img, .mini .mono { width: 48px; height: 48px; border-radius: 12px; font-size: 16px; }
+
+/* overlays */
+.ov { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; background: #000; opacity: 0; visibility: hidden; transition: opacity .3s var(--ease), visibility 0s .3s; }
+.ov.open { opacity: 1; visibility: visible; transition: opacity .3s var(--ease); }
+.ov .hd { position: absolute; left: 120px; right: 120px; top: 70px; display: flex; justify-content: space-between; align-items: baseline; }
+.ov .hd .big { font-size: 64px; }
+.ov .box { position: absolute; left: 100px; right: 100px; top: 180px; bottom: 0; overflow: hidden; }
+.ov .apps { position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: repeat(6, 1fr); grid-gap: 18px; padding: 20px; transition: transform .35s var(--ease); }
+.ov .cell { height: 230px; border-radius: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform .25s var(--ease), background-color .25s var(--ease), box-shadow .25s var(--ease); }
+.ov .cell img, .ov .cell .mono { width: 100px; height: 100px; border-radius: 24px; font-size: 34px; }
+.ov .cell span { margin-top: 18px; font-size: 24px; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov .cell.on { background: #121214; box-shadow: 0 0 0 3px rgba(255,255,255,.9); transform: scale(1.04); }
+.ov .rows { padding: 20px; width: 1000px; }
+.ov .row { display: flex; align-items: center; height: 120px; padding: 0 36px; margin-bottom: 18px; border-radius: 36px; background: #0e0e10; transition: transform .25s var(--ease), background-color .25s var(--ease), box-shadow .25s var(--ease); }
+.ov .row .nm { font-size: 38px; flex: 1; }
+.ov .row .st { font-size: 24px; text-transform: uppercase; color: var(--mute); }
+.ov .row .st.live { color: var(--green); }
+.ov .row.on { background: #121214; box-shadow: 0 0 0 3px rgba(255,255,255,.9); transform: scale(1.02); }
+
+#ambient .bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; }
+#ambient .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 520px; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.7)); }
+#ambient .clk { position: absolute; left: 110px; bottom: 96px; }
+#ambient .clk .t { font-size: 200px; line-height: 1; letter-spacing: -.04em; }
+#ambient .clk .d { font-weight: 500; font-size: 34px; color: rgba(255,255,255,.75); margin-top: 10px; text-transform: uppercase; }
+#ambient .cr { position: absolute; right: 110px; bottom: 110px; text-align: right; font-weight: 500; font-size: 24px; color: rgba(255,255,255,.7); }
+#ambient .cr b { display: block; color: #fff; font-weight: 700; font-size: 30px; margin-bottom: 4px; }
+
+#toast { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 14px 26px; border-radius: 20px; background: #1c1c1e; font-size: 24px; white-space: nowrap; opacity: 0; transition: opacity .2s; }
+#toast.show { opacity: 1; }
+#toast.err { color: var(--red); }
+</style>
+</head>
+<body tabindex="-1">
+<div id="stage">
+  <div class="grid">
+    <div class="w time" id="w-time"></div>
+    <div class="w" id="w-clocks"></div>
+    <div class="w" id="w-moon"></div>
+    <div class="w f" id="w-vol" data-act="mute"></div>
+
+    <div class="w f app" id="w-app0" data-act="app"></div>
+    <div class="w f app" id="w-app1" data-act="app"></div>
+    <div class="w f app" id="w-app2" data-act="app"></div>
+    <div class="w f app" id="w-app3" data-act="app"></div>
+
+    <div class="w f" id="w-inputs" data-act="inputs"></div>
+    <div class="w f" id="w-photo" data-act="ambient"></div>
+    <div class="w f" id="w-all" data-act="all"></div>
+    <div class="w f" id="w-set" data-act="settings"></div>
+  </div>
+
+  <div class="ov" id="ov-apps">
+    <div class="hd"><div class="big">All apps</div><div class="lbl" id="ov-count"></div></div>
+    <div class="box"><div class="apps" id="ov-grid"></div></div>
+  </div>
+  <div class="ov" id="ov-inputs">
+    <div class="hd"><div class="big">Inputs</div><div class="lbl">OK to switch · Back to close</div></div>
+    <div class="box"><div class="rows" id="ov-rows"></div></div>
+  </div>
+  <div class="ov" id="ambient">
+    <div class="bg" id="am-bg"></div><div class="shade"></div>
+    <div class="clk"><div class="t" id="am-t"></div><div class="d" id="am-d"></div></div>
+    <div class="cr"><b id="am-title"></b><span id="am-by"></span></div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script src="designs.js"></script>
+<script>
+(function () {
+  'use strict';
+  var WALLS = [
+    ['01.jpg', 'Aoraki / Mount Cook', 'Michal Klajban'], ['02.jpg', 'Three Sisters, Canmore', 'Jakub Fryš'],
+    ['03.jpg', 'Llyn Ogwen, Milky Way', 'John Badham'], ['04.jpg', 'Aurora borealis, Estonia', 'Kristian Pikner'],
+    ['05.jpg', 'Lake Mystery, Canterbury', 'Michal Klajban'], ['06.jpg', 'Soltan salt lake, Iran', 'Amir Pashaei'],
+    ['07.jpg', 'Sossusvlei, Namibia', 'Diego Delso'], ['08.jpg', 'Sossusvlei dunes, Namibia', 'Diego Delso'],
+    ['09.jpg', 'Geirangerfjord, Norway', 'Ximonic (Simo Räsänen)'], ['10.jpg', 'Lago do Cuniã, Brazil', 'RodrigoErse'],
+    ['11.jpg', 'Tschierva glacier, Switzerland', 'Daniel Schwen'], ['12.jpg', 'View from Herzogenhorn', 'Jörg Braukmann'],
+    ['13.jpg', 'Westruper Heide, Haltern', 'Dietmar Rabich'], ['14.jpg', 'Volcán Pacaya, Guatemala', 'Christopher Crouzet']
+  ];
+  var ROTATE_MS = 120000;
+  var ACCENT = { 'youtube': '#ff453a', 'netflix': '#ff375f', 'plex': '#ffb000', 'tv browser': '#64d2ff', 'spotify': '#30d158', 'stremio lite': '#8e7dff', 'prime video': '#64d2ff', 'dstv now': '#0a84ff' };
+  var DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  var MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  var OTHER_TZ = { zone: 'America/New_York', code: 'NYC' };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var icons = {}, home = [], shown = [], all = [], sources = [], tvState = null, volume = null, muted = false;
+  var focused = null, overlay = null, wall = 0, wallAt = Date.now();
+
+  function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var opens = load('d3opens') || {};   // app name -> [timestamps of opens], last 7 days
+
+  function api(path, done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', path, true); x.timeout = 15000;
+    x.onload = function () { var r = null; try { r = JSON.parse(x.responseText); } catch (e) {} if (done) done(r); };
+    x.onerror = x.ontimeout = function () { if (done) done(null); };
+    x.send();
+  }
+
+  // ---------- words ----------
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function clean(n) { return String(n).replace(/[▶︎]/g, '').replace(/\s*[:.]\s*$/, '').replace(/\s*:\s.*$/, '').trim(); }
+  function nice(n) { var c = clean(n); return c === 'TV Browser' ? 'Browser' : c; }
+  function inputName(n) { return clean(n).replace(/^HDMI(\d)/i, 'HDMI $1').replace(/^TV Channels$/i, 'TV'); }
+  function pad(n) { return ('0' + n).slice(-2); }
+  function logo(name, cls) {
+    var key = clean(name).toLowerCase();
+    if (icons[key]) return '<img src="icons/' + icons[key] + '.png" alt="">';
+    if (key === 'tv browser') return '<div class="gl"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 3.6 5.6 3.6 9s-1 6.3-3.6 9c-2.6-2.7-3.6-5.6-3.6-9s1-6.3 3.6-9z"/></svg></div>';
+    var w = nice(name).split(/\s+/);
+    return '<div class="mono">' + esc((w[0].charAt(0) + (w[1] ? w[1].charAt(0) : '')).toUpperCase()) + '</div>';
+  }
+
+  // ---------- svg pieces ----------
+  function dial(cx, cy, r, date, light) {
+    var face = light ? '#f2f2f7' : '#1c1c1e', ink = light ? '#1c1c1e' : '#f2f2f7', s = '';
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + face + '"' + (light ? '' : ' stroke="#3a3a3c" stroke-width="2"') + '/>';
+    for (var i = 0; i < 60; i++) {
+      var a = i * Math.PI / 30, big = i % 5 === 0, r1 = r - 4, r2 = r - (big ? 16 : 9);
+      s += '<line x1="' + (cx + Math.sin(a) * r1).toFixed(1) + '" y1="' + (cy - Math.cos(a) * r1).toFixed(1) + '" x2="' + (cx + Math.sin(a) * r2).toFixed(1) + '" y2="' + (cy - Math.cos(a) * r2).toFixed(1) +
+        '" stroke="' + ink + '" stroke-opacity="' + (big ? .9 : .35) + '" stroke-width="' + (big ? 3 : 1.5) + '"/>';
+    }
+    var h = date.getHours() % 12 + date.getMinutes() / 60, m = date.getMinutes() + date.getSeconds() / 60;
+    var ha = h * Math.PI / 6, ma = m * Math.PI / 30;
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + Math.sin(ha) * r * .5).toFixed(1) + '" y2="' + (cy - Math.cos(ha) * r * .5).toFixed(1) + '" stroke="' + (light ? '#e8452b' : ink) + '" stroke-width="7" stroke-linecap="round"/>';
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + Math.sin(ma) * r * .78).toFixed(1) + '" y2="' + (cy - Math.cos(ma) * r * .78).toFixed(1) + '" stroke="' + (light ? '#e8452b' : ink) + '" stroke-width="4" stroke-linecap="round"/>';
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="6" fill="' + face + '" stroke="' + (light ? '#e8452b' : ink) + '" stroke-width="3"/>';
+    return s;
+  }
+  // a moon at phase p (0 new, .5 full), lit part drawn as a half disc plus a terminator ellipse
+  function moon(cx, cy, r, p, lit, dark) {
+    var k = Math.cos(2 * Math.PI * p), rx = Math.abs(k) * r, sweep = k > 0 ? 0 : 1;
+    var path = 'M0,' + (-r) + ' A' + r + ',' + r + ' 0 0 1 0,' + r + ' A' + rx.toFixed(2) + ',' + r + ' 0 0 ' + sweep + ' 0,' + (-r) + ' Z';
+    return '<g transform="translate(' + cx + ',' + cy + ')' + (p > .5 ? ' scale(-1,1)' : '') + '"><circle r="' + r + '" fill="' + dark + '"/><path d="' + path + '" fill="' + lit + '"/></g>';
+  }
+
+  // ---------- moon maths ----------
+  var SYNODIC = 29.530588853;
+  function moonAge(d) {
+    var jd = d.getTime() / 86400000 + 2440587.5;
+    var age = (jd - 2451550.1) % SYNODIC;
+    return age < 0 ? age + SYNODIC : age;
+  }
+  function phaseName(age) {
+    var f = age / SYNODIC;
+    if (f < .03 || f > .97) return 'New Moon';
+    if (f < .22) return 'Waxing Crescent';
+    if (f < .28) return 'First Quarter';
+    if (f < .47) return 'Waxing Gibbous';
+    if (f < .53) return 'Full Moon';
+    if (f < .72) return 'Waning Gibbous';
+    if (f < .78) return 'Last Quarter';
+    return 'Waning Crescent';
+  }
+
+  // ---------- widgets ----------
+  function nowLabel() {
+    var s = tvState || {};
+    if (s.statetype === 'app') return /hisensebar/i.test(s.name || '') ? ['Home', 'var(--green)'] : [nice(s.name || 'App'), 'var(--cyan)'];
+    if (s.sourcename) return [inputName(s.sourcename), 'var(--orange)'];
+    if (s.statetype === 'fake_sleep_0') return ['Standby', 'var(--mute)'];
+    return ['Home', 'var(--green)'];
+  }
+  function drawTime(d) {
+    var h = d.getHours() % 12 || 12, now = nowLabel();
+    var dayFrac = (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) / 86400;
+    $('w-time').innerHTML =
+      '<div class="top"><span class="lbl">' + DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + '</span><span class="word" style="color:' + now[1] + '">' + esc(now[0]) + '</span></div>' +
+      '<div class="big">' + h + ':' + pad(d.getMinutes()) + '<small>' + (d.getHours() < 12 ? 'AM' : 'PM') + '</small></div>' +
+      '<div class="cap"><i style="width:' + (dayFrac * 100).toFixed(2) + '%;background:linear-gradient(90deg,#1d3b5a,#64d2ff)"></i><b style="left:' + Math.max(4, Math.min(96, dayFrac * 100)).toFixed(2) + '%"></b></div>';
+  }
+  function zoneTime(zone) {
+    try { return new Date(new Date().toLocaleString('en-US', { timeZone: zone })); } catch (e) { return null; }
+  }
+  function drawClocks(d) {
+    var other = zoneTime(OTHER_TZ.zone) || d;
+    var diff = Math.round((other - d) / 3600000);
+    var here = 'HOME';
+    try { here = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').split('/').pop().replace(/_/g, ' ').slice(0, 3).toUpperCase() || 'HOME'; } catch (e) {}
+    // dark dial first so the light (local) one overlaps it
+    var s = '<svg width="348" height="232" viewBox="0 0 348 232">' + dial(244, 116, 104, other, false) + dial(108, 116, 104, d, true) +
+      '<text x="108" y="82" text-anchor="middle" font-size="26" font-weight="700" fill="#1c1c1e">' + esc(here) + '</text>' +
+      '<text x="108" y="170" text-anchor="middle" font-size="22" font-weight="500" fill="#8e8e93">LOCAL</text>' +
+      '<text x="262" y="82" text-anchor="middle" font-size="26" font-weight="700" fill="#f2f2f7">' + OTHER_TZ.code + '</text>' +
+      '<text x="262" y="170" text-anchor="middle" font-size="22" font-weight="500" fill="#8e8e93">' + (diff >= 0 ? '+' : '−') + Math.abs(diff) + 'H</text></svg>';
+    $('w-clocks').innerHTML = s;
+  }
+  function drawMoon(d) {
+    var age = moonAge(d), illum = (1 - Math.cos(2 * Math.PI * age / SYNODIC)) / 2;
+    var toFull = (SYNODIC / 2 - age + SYNODIC) % SYNODIC;
+    var days = Math.round(toFull);
+    var s = '<svg width="348" height="110" viewBox="0 0 348 110">', xs = [22, 66, 112, 174, 236, 282, 326], rs = [17, 20, 24, 38, 24, 20, 17];
+    for (var i = 0; i < 7; i++) {
+      var p = ((age + (i - 3) * 3.7) % SYNODIC + SYNODIC) % SYNODIC / SYNODIC;
+      s += moon(xs[i], 55, rs[i], p, i === 3 ? '#ffffff' : '#9a9aa0', i === 3 ? '#2c2c2e' : '#2c2c2e');
+    }
+    s += '</svg>';
+    $('w-moon').innerHTML =
+      '<div class="top"><span class="word" style="color:var(--violet);text-transform:none">' + phaseName(age) + '</span><span class="big" style="font-size:44px">' + Math.round(illum * 100) + '<small>%</small></span></div>' +
+      '<div style="margin-top:34px">' + s + '</div>' +
+      '<div class="sub" style="margin-top:22px">' + (days === 0 ? '<b>Full moon</b> tonight' : 'Next full moon in <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b>') + '</div>';
+  }
+  function drawVolume() {
+    var v = volume == null ? 0 : volume;
+    var word = muted ? ['Muted', 'var(--mute)'] : v < 15 ? ['Quiet', 'var(--green)'] : v < 40 ? ['Medium', 'var(--yellow)'] : ['Loud', 'var(--pink)'];
+    var cols = ['#2a2350', '#3d2766', '#5a2a74', '#8a2d6d', '#c22d63'], hs = [30, 44, 58, 74, 92], bars = '';
+    for (var i = 0; i < 5; i++) bars += '<i style="height:' + hs[i] + 'px;background:' + cols[i] + (v >= i * 20 && v > 0 && !muted ? ';filter:brightness(1.5)' : '') + '"></i>';
+    $('w-vol').innerHTML =
+      '<div class="top"><span class="lbl">Volume</span><span class="word" style="color:' + word[1] + '">' + word[0] + '</span></div>' +
+      '<div class="big" style="margin-top:12px">' + (volume == null ? '--' : v) + '<small style="color:var(--mute)"> / 100</small></div>' +
+      '<div class="steps">' + bars + '<span class="mark" style="left:' + Math.max(1, Math.min(99, v)) + '%;height:' + (30 + v * .7).toFixed(0) + 'px"></span></div>' +
+      '<div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>';
+  }
+  function ago(t) {
+    if (!t) return null;
+    var m = Math.floor((Date.now() - t) / 60000);
+    if (m < 1) return ['NOW', ''];
+    if (m < 60) return [m + '<small>M</small>', ' ago'];
+    var h = Math.floor(m / 60);
+    if (h < 24) return [h + '<small>H</small> ' + (m % 60) + '<small>M</small>', ' ago'];
+    var dd = Math.floor(h / 24);
+    return [dd + '<small>D</small> ' + (h % 24) + '<small>H</small>', ' ago'];
+  }
+  function drawApp(i) {
+    var el = $('w-app' + i), name = home[i];
+    if (!name) { el.innerHTML = ''; el.className = 'w app'; return; }
+    el.className = 'w f app' + (el === focused ? ' on' : '');
+    el.setAttribute('data-name', name);
+    var acc = ACCENT[clean(name).toLowerCase()] || '#64d2ff';
+    var list = opens[clean(name)] || [], last = list.length ? list[list.length - 1] : 0, a = ago(last);
+    var today = new Date(), day0 = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    var counts = [], max = 1;
+    for (var k = 6; k >= 0; k--) {
+      var from = day0 - k * 86400000, to = from + 86400000, c = 0;
+      for (var j = 0; j < list.length; j++) if (list[j] >= from && list[j] < to) c++;
+      counts.push([c, new Date(from).getDay(), k === 0]); if (c > max) max = c;
+    }
+    var bars = counts.map(function (c) {
+      var h = c[0] ? 14 + 40 * c[0] / max : 14;
+      return '<div class="c' + (c[2] ? ' today' : '') + '"><i style="height:' + h.toFixed(0) + 'px;' + (c[0] ? 'background:' + acc + (c[2] ? ';box-shadow:0 0 12px ' + acc : '') : '') + '"></i><span>' + DAYS[c[1]].charAt(0) + '</span></div>';
+    }).join('');
+    var week = counts.reduce(function (s, c) { return s + c[0]; }, 0);
+    el.innerHTML =
+      '<div class="head">' + logo(name) + '<span class="name">' + esc(nice(name)) + '</span><span class="go" style="background:' + acc + '">OPEN</span></div>' +
+      '<div class="big">' + (a ? a[0] : week + '<small style="color:var(--mute)"> opens</small>') + '</div>' +
+      '<div class="sub" style="color:' + (a ? acc : 'var(--mute)') + '">' + (a ? (a[1] ? 'Since last opened' : 'Opened just now') : 'Not opened yet') + (week ? ' · ' + week + ' this week' : '') + '</div>' +
+      '<div class="bars">' + bars + '</div>';
+  }
+  function drawInputs() {
+    var list = sources.filter(function (s) { return /^(tv|hdmi|av)/i.test(s.id); }).slice(0, 5);
+    var live = list.filter(function (s) { return s.signal; }).length;
+    $('w-inputs').innerHTML =
+      '<div class="top"><span class="lbl">Inputs</span><span class="word" style="color:' + (live ? 'var(--green)' : 'var(--mute)') + '">' + (live ? 'Live' : 'Idle') + '</span></div>' +
+      '<div class="big" style="margin-top:12px">' + live + '<small style="color:var(--mute)"> / ' + list.length + ' connected</small></div>' +
+      '<div class="ins">' + list.map(function (s) {
+        return '<div class="c' + (s.signal ? ' live' : '') + '"><div class="dots"><i></i><i></i><i></i></div><span>' + esc(inputName(s.name).replace('HDMI ', 'HDMI')) + '</span></div>';
+      }).join('') + '</div>';
+  }
+  function drawPhoto() {
+    var w = WALLS[wall], p = Math.min(1, (Date.now() - wallAt) / ROTATE_MS);
+    $('w-photo').innerHTML =
+      '<div class="top"><span class="lbl">Photo ' + pad(wall + 1) + ' / ' + WALLS.length + '</span><span class="word" style="color:var(--teal)">Ambient</span></div>' +
+      '<div class="ph" style="background-image:url(bg/1080s/' + w[0] + ')"><div class="prog"><i style="width:' + (p * 100).toFixed(1) + '%"></i></div></div>' +
+      '<div class="sub" style="margin-top:12px;color:var(--fg)">' + esc(w[1]) + '</div>';
+  }
+  function drawAll() {
+    var picks = all.slice(0, 12);
+    $('w-all').innerHTML =
+      '<div class="top"><span class="lbl">Library</span><span class="word" style="color:var(--orange)">Browse</span></div>' +
+      '<div class="big" style="margin-top:12px">' + (all.length || '--') + '<small style="color:var(--mute)"> apps</small></div>' +
+      '<div class="mini">' + picks.map(function (n) { return logo(n); }).join('') + '</div>';
+  }
+  function drawSettings() {
+    var s = '<svg width="348" height="150" viewBox="0 0 348 150">', cx = 174, cy = 168, r = 150;
+    s += '<path d="M' + (cx - r) + ',' + cy + ' A' + r + ',' + r + ' 0 0 1 ' + (cx + r) + ',' + cy + '" stroke="#1c1c1e" stroke-width="44" fill="none"/>';
+    for (var i = 0; i <= 36; i++) {
+      var a = Math.PI + i * Math.PI / 36, big = i % 6 === 0, r1 = r + 14, r2 = r - (big ? 16 : 6);
+      s += '<line x1="' + (cx + Math.cos(a) * r1).toFixed(1) + '" y1="' + (cy + Math.sin(a) * r1).toFixed(1) + '" x2="' + (cx + Math.cos(a) * r2).toFixed(1) + '" y2="' + (cy + Math.sin(a) * r2).toFixed(1) +
+        '" stroke="#fff" stroke-opacity="' + (big ? .85 : .3) + '" stroke-width="' + (big ? 3 : 1.5) + '"/>';
+    }
+    var labels = ['PIC', 'SND', 'NET', 'SYS'];
+    for (var j = 0; j < 4; j++) {
+      var b = Math.PI + (j + .5) * Math.PI / 4;
+      s += '<text x="' + (cx + Math.cos(b) * (r - 38)).toFixed(1) + '" y="' + (cy + Math.sin(b) * (r - 38) + 8).toFixed(1) + '" text-anchor="middle" font-size="20" font-weight="500" fill="#8e8e93">' + labels[j] + '</text>';
+    }
+    s += '<path d="M' + cx + ',' + (cy - r - 20) + ' l-11,-18 h22 z" fill="#ff453a"/></svg>';
+    $('w-set').innerHTML =
+      '<div class="top"><span class="lbl">Settings</span><span class="word" style="color:var(--red)">TV Menu</span></div>' +
+      '<div style="margin-top:34px;position:relative">' + s + '<div style="position:absolute;left:0;right:0;bottom:-6px;text-align:center;font-size:44px" class="big">MENU</div></div>';
+  }
+
+  // ---------- wallpaper + overlays ----------
+  function showWall(i) {
+    wall = (i + WALLS.length) % WALLS.length; wallAt = Date.now(); save('d3wall', wall);
+    $('am-bg').style.backgroundImage = 'url(bg/1080s/' + WALLS[wall][0] + ')';
+    $('am-title').textContent = WALLS[wall][1];
+    $('am-by').textContent = 'Photo by ' + WALLS[wall][2];
+    drawPhoto();
+  }
+  function renderOverlayApps() {
+    $('ov-count').textContent = all.length + ' installed';
+    $('ov-grid').innerHTML = all.map(function (n) {
+      return '<div class="cell f" data-act="app" data-name="' + esc(n) + '">' + logo(n) + '<span>' + esc(nice(n)) + '</span></div>';
+    }).join('');
+  }
+  function renderOverlayInputs() {
+    $('ov-rows').innerHTML = sources.filter(function (s) { return /^(tv|hdmi|av)/i.test(s.id); }).map(function (s) {
+      return '<div class="row f" data-act="source" data-id="' + esc(s.id) + '"><span class="nm">' + esc(inputName(s.name)) + '</span><span class="st' + (s.signal ? ' live' : '') + '">' + (s.signal ? 'Connected' : 'No signal') + '</span></div>';
+    }).join('');
+  }
+  function openOverlay(id) {
+    var back = focused;
+    if (overlay) $(overlay).className = 'ov';
+    overlay = id;
+    if (!id) return;
+    if (id === 'ov-apps') { renderOverlayApps(); $('ov-grid').style.transform = 'translateY(0)'; $('ov-grid').setAttribute('data-y', '0'); }
+    if (id === 'ov-inputs') renderOverlayInputs();
+    $(id).className = 'ov open';
+    $(id).setAttribute('data-back', back ? back.id : '');
+    if (id !== 'ambient') focus($(id).querySelector('.f'));
+  }
+  function closeOverlay() {
+    if (!overlay) return;
+    var back = $(overlay).getAttribute('data-back');
+    $(overlay).className = 'ov'; overlay = null;
+    focus((back && $(back)) || $('w-app0'));
+  }
+
+  // ---------- focus + spatial navigation ----------
+  function focus(el) {
+    if (!el) return;
+    if (focused) focused.classList.remove('on');
+    focused = el; el.classList.add('on');
+    if (overlay === 'ov-apps') scrollGrid();
+  }
+  function pool() {
+    var root = overlay ? $(overlay) : $('stage'), list = root.querySelectorAll('.f'), out = [];
+    for (var i = 0; i < list.length; i++) if (overlay || !list[i].closest('.ov')) out.push(list[i]);
+    return out;
+  }
+  function move(dx, dy) {
+    var list = pool();
+    if (!focused || list.indexOf(focused) < 0) return focus(list[0]);
+    var a = focused.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2, best = null, bestScore = Infinity;
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]; if (el === focused) continue;
+      var b = el.getBoundingClientRect(); if (!b.width) continue;
+      var bx = b.left + b.width / 2, by = b.top + b.height / 2;
+      var edge = dx ? (dx > 0 ? b.left >= a.right - 12 : b.right <= a.left + 12) : (dy > 0 ? b.top >= a.bottom - 12 : b.bottom <= a.top + 12);
+      if (!edge) continue;
+      var along = dx ? (bx - ax) * dx : (by - ay) * dy, across = dx ? Math.abs(by - ay) : Math.abs(bx - ax);
+      var overlap = dx ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      var score = along + across * 2 - (overlap > 0 ? 400 : 0);
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    if (best) focus(best);
+  }
+  function scrollGrid() {
+    var grid = $('ov-grid'), box = grid.parentNode;
+    if (!grid.contains(focused)) return;
+    var top = focused.offsetTop, h = focused.offsetHeight + 40, y = +(grid.getAttribute('data-y') || 0), view = box.clientHeight;
+    if (top - 20 < y) y = Math.max(0, top - 20); else if (top + h > y + view) y = top + h - view;
+    grid.setAttribute('data-y', String(y));
+    grid.style.transform = 'translateY(' + (-y) + 'px)';
+  }
+
+  // ---------- actions ----------
+  var toastTimer;
+  function toast(msg, err) {
+    var t = $('toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, 2200);
+  }
+  function openApp(name) {
+    var key = clean(name), week = Date.now() - 7 * 86400000;
+    opens[key] = (opens[key] || []).filter(function (t) { return t > week; });
+    opens[key].push(Date.now()); save('d3opens', opens);
+    toast('Opening ' + nice(name));
+    api('/api/launch?name=' + encodeURIComponent(name), function (r) { if (!r || !r.ok) toast('Could not open ' + nice(name), true); });
+    for (var i = 0; i < 4; i++) drawApp(i);
+  }
+  function activate() {
+    var el = focused; if (!el) return;
+    var act = el.getAttribute('data-act');
+    if (act === 'app') openApp(el.getAttribute('data-name'));
+    else if (act === 'all') openOverlay('ov-apps');
+    else if (act === 'inputs') openOverlay('ov-inputs');
+    else if (act === 'ambient') openOverlay('ambient');
+    else if (act === 'settings') api('/api/key?k=KEY_MENU');
+    else if (act === 'mute') { muted = !muted; drawVolume(); api('/api/key?k=KEY_MUTE'); }
+    else if (act === 'source') {
+      var id = el.getAttribute('data-id');
+      toast('Switching to ' + inputName(id));
+      api('/api/source?id=' + encodeURIComponent(id), function (r) { if (!r || !r.ok) toast('Could not switch input', true); });
+    }
+  }
+  function keyName(e) {
+    var alias = { Left: 'ArrowLeft', Right: 'ArrowRight', Up: 'ArrowUp', Down: 'ArrowDown', Select: 'Enter', OK: 'Enter', Accept: 'Enter', GoBack: 'Escape', Back: 'Escape', BrowserBack: 'Escape' };
+    if (alias[e.key]) return alias[e.key];
+    switch (e.keyCode || e.which) {
+      case 37: return 'ArrowLeft'; case 38: return 'ArrowUp'; case 39: return 'ArrowRight'; case 40: return 'ArrowDown';
+      case 13: case 23: case 66: return 'Enter';
+      case 27: case 8: case 461: case 10009: return 'Escape';
+    }
+    return e.key;
+  }
+  window.addEventListener('keydown', function (e) {
+    var k = keyName(e);
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape'].indexOf(k) < 0) return;
+    e.preventDefault();
+    if (overlay === 'ambient') { closeOverlay(); return; }
+    if (k === 'ArrowLeft') move(-1, 0);
+    else if (k === 'ArrowRight') move(1, 0);
+    else if (k === 'ArrowUp') move(0, -1);
+    else if (k === 'ArrowDown') move(0, 1);
+    else if (k === 'Escape') { if (overlay) closeOverlay(); else focus($('w-app0')); }
+    else if (!e.repeat) activate();
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (overlay === 'ambient') { closeOverlay(); return; }
+    var el = e.target; while (el && el !== document && !(el.classList && el.classList.contains('f'))) el = el.parentNode;
+    if (el && el.classList) { focus(el); activate(); }
+  });
+
+  // The home row comes from the server; when it has fewer than four apps, the grid borrows favourites from the library.
+  var FILL = ['spotify', 'stremio', 'prime video', 'dstv', 'plex'];
+  function fillHome() {
+    home = shown.slice(0, 4);
+    var have = home.map(function (n) { return clean(n).toLowerCase(); });
+    for (var f = 0; f < FILL.length && home.length < 4; f++) {
+      for (var j = 0; j < all.length; j++) {
+        var c = clean(all[j]).toLowerCase();
+        if (c.indexOf(FILL[f]) === 0 && have.indexOf(c) < 0) { home.push(all[j]); have.push(c); break; }
+      }
+    }
+    for (var i = 0; i < 4; i++) drawApp(i);
+    if (!focused || !focused.classList.contains('f')) focus($('w-app0'));
+  }
+
+  // ---------- clock + data ----------
+  function tick() {
+    var d = new Date();
+    drawTime(d); drawClocks(d);
+    $('am-t').textContent = (d.getHours() % 12 || 12) + ':' + pad(d.getMinutes());
+    $('am-d').textContent = DAYS[d.getDay()] + ' · ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+    if (Date.now() - wallAt > ROTATE_MS) showWall(wall + 1); else drawPhoto();
+    if (d.getSeconds() === 0) { drawMoon(d); for (var i = 0; i < 4; i++) drawApp(i); }
+  }
+  function loadState() { api('/api/state', function (r) { if (r && r.ok) { tvState = r.data; drawTime(new Date()); } }); }
+  function loadVolume() { api('/api/volume', function (r) { if (r && r.ok && r.data) { if (r.data.volume_value != null) volume = r.data.volume_value; muted = !!r.data.muted; drawVolume(); } }); }
+  function loadSources() { api('/api/sources', function (r) { if (r && r.ok && r.data) { sources = r.data; drawInputs(); if (overlay === 'ov-inputs') renderOverlayInputs(); } }); }
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080), st = $('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+  drawVolume(); drawInputs(); drawAll(); drawSettings(); drawMoon(new Date());
+  showWall(+(load('d3wall') || 0));
+  for (var i = 0; i < 4; i++) drawApp(i);
+  tick(); setInterval(tick, 1000);
+  api('icons/index.json', function (r) {
+    if (r) icons = r;
+    api('/api/apps', function (r) { if (r && r.ok && r.data) { shown = r.data; fillHome(); } });
+    api('/api/apps?all=1', function (r) { if (r && r.ok && r.data) { all = r.data; drawAll(); fillHome(); } });
+  });
+  loadState(); setInterval(loadState, 5000);
+  loadVolume(); setInterval(loadVolume, 5000);
+  loadSources(); setInterval(loadSources, 30000);
+  focus($('w-app0'));
+  document.body.focus();
+})();
+</script>
+</body>
+</html>

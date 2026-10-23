@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Space</title>
+<style>
+/* Design 6 · Space. An endless tilted field of poster cards (painted by d6-cards.js) drawn in WebGL: the camera glides
+   between cards on a spring, the plane leans with the motion, and selecting a card throws it forward while flat shapes
+   burst out of the field. Blush ground, charcoal ink, flat retro colours, Bagel Fat One + Archivo. CSS 3D is the fallback. */
+@font-face { font-family: "Bagel Fat One"; src: url(fonts/BagelFatOne.woff2) format("woff2"); }
+@font-face { font-family: "Archivo Black"; src: url(fonts/ArchivoBlack.woff2) format("woff2"); }
+@font-face { font-family: Archivo; src: url(fonts/Archivo-700.woff2) format("woff2"); font-weight: 700; }
+@font-face { font-family: Archivo; src: url(fonts/Archivo-800.woff2) format("woff2"); font-weight: 800; }
+:root { --blush: #efe2e0; --cream: #f6ede7; --ink: #2b2a2a; --cobalt: #2c6bb5; --teal: #1e8c6c; --mustard: #f0a32e; --orange: #ea6232; --pink: #f2a2ad; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--blush); }
+body { font-family: Archivo, sans-serif; color: var(--ink); outline: none; }
+#stage { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--blush); transform-origin: 0 0; }
+#stage:before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background-image: linear-gradient(rgba(43,42,42,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(43,42,42,.05) 1px, transparent 1px);
+  background-size: 32px 32px; }
+#gl, #css { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; transition: filter .5s cubic-bezier(.23,1,.32,1), opacity .5s cubic-bezier(.23,1,.32,1), transform .6s cubic-bezier(.23,1,.32,1); }
+#css { display: none; perspective: 1500px; perspective-origin: 960px 562px; }
+.selecting #gl, .selecting #css { filter: blur(6px); opacity: .5; transform: scale(.95); }
+.fade { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 56% at 50% 52%, rgba(239,226,224,0) 38%, rgba(239,226,224,.86) 76%, #efe2e0 96%),
+    linear-gradient(180deg, rgba(239,226,224,0) 74%, rgba(239,226,224,.95) 92%),
+    linear-gradient(90deg, rgba(239,226,224,.92) 0, rgba(239,226,224,0) 16%); }
+#grain { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; opacity: .5; mix-blend-mode: multiply; pointer-events: none; }
+
+/* CSS fallback cards */
+.plane { position: absolute; left: 960px; top: 562px; transform-style: preserve-3d; }
+.plane .c { position: absolute; width: 320px; height: 200px; margin: -100px 0 0 -160px; border-radius: 16px; box-shadow: 0 0 0 1.5px rgba(43,42,42,.16), 7px 8px 0 rgba(43,42,42,.10); }
+.plane .c canvas { width: 320px; height: 200px; border-radius: 16px; display: block; }
+.plane .c.on { box-shadow: 0 0 0 5px #2b2a2a, 14px 16px 0 5px #2b2a2a; }
+
+/* HUD */
+.hud { position: absolute; z-index: 5; transition: opacity .35s; }
+.time { left: 72px; top: 52px; font: 400 92px/1 "Bagel Fat One"; letter-spacing: -.01em; }
+.spec { left: 76px; top: 170px; font: 800 13px/1.45 Archivo; text-transform: uppercase; letter-spacing: .05em; }
+.spec p + p { margin-top: 12px; }
+.right { right: 72px; top: 60px; text-align: right; font: 800 13px/1.45 Archivo; text-transform: uppercase; letter-spacing: .05em; }
+.right b { display: block; font: 400 30px/1 "Archivo Black"; letter-spacing: -.01em; margin-bottom: 8px; text-transform: none; }
+.right .off { color: var(--orange); }
+.bar { left: 72px; right: 72px; bottom: 44px; display: flex; align-items: flex-end; justify-content: space-between; }
+.bar .name { font: 400 76px/0.95 "Bagel Fat One"; white-space: nowrap; max-width: 1180px; overflow: hidden; text-overflow: ellipsis; }
+.bar .sub { font: 800 13px Archivo; text-transform: uppercase; letter-spacing: .06em; margin-top: 12px; }
+.pill { display: inline-block; padding: 8px 16px; border: 2px solid var(--ink); border-radius: 999px; font: 800 13px Archivo; text-transform: uppercase; letter-spacing: .06em; margin-left: 10px; white-space: nowrap; }
+.pill.fill { background: var(--ink); color: var(--cream); }
+.mini { position: relative; width: 168px; height: 110px; border-radius: 14px; background: var(--ink); margin-left: 28px; flex: none; }
+.mini i { position: absolute; width: 12px; height: 8px; border-radius: 2px; background: #4a4848; transition: background .2s; }
+.mini i.on { background: var(--pink); }
+.selecting .spec, .selecting .mini, .selecting .pills { opacity: 0; }
+
+/* select effect */
+#hero { position: absolute; left: 0; top: 0; width: 1040px; height: 650px; z-index: 4; display: none; transform-origin: 50% 50%; will-change: transform; }
+#hero canvas { width: 1040px; height: 650px; border-radius: 40px; display: block; box-shadow: 0 0 0 8px var(--ink), 26px 30px 0 8px var(--ink); }
+#burst { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; z-index: 3; pointer-events: none; }
+
+/* volume card */
+#vol { position: absolute; right: 72px; top: 150px; z-index: 6; width: 300px; padding: 18px 22px 20px; border-radius: 22px; background: var(--ink); color: var(--cream);
+  box-shadow: 9px 10px 0 rgba(43,42,42,.18); opacity: 0; transform: translateY(-10px) rotate(-1.5deg); transition: opacity .25s, transform .35s cubic-bezier(.3,1.4,.5,1); }
+#vol.on { opacity: 1; transform: translateY(0) rotate(-1.5deg); }
+#vol .n { font: 400 64px/1 "Bagel Fat One"; }
+#vol .t { font: 800 12px Archivo; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin-top: 4px; }
+#vol .bars { display: flex; margin-top: 14px; }
+#vol .bars i { flex: 1; height: 14px; border-radius: 7px; background: #4a4848; margin-right: 5px; }
+#vol .bars i:last-child { margin-right: 0; }
+#vol .bars i.f { background: var(--pink); }
+
+/* all apps */
+#lib { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; z-index: 8; background: var(--ink); color: var(--cream); display: none; overflow: hidden; }
+#lib:before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 32px 32px; }
+#lib.on { display: block; }
+#lib h2 { position: absolute; left: 96px; top: 60px; font: 400 92px/1 "Bagel Fat One"; }
+#lib .meta { position: absolute; right: 96px; top: 74px; text-align: right; font: 800 13px/1.45 Archivo; text-transform: uppercase; letter-spacing: .05em; }
+#lib .cols { position: absolute; left: 96px; right: 96px; top: 200px; bottom: 80px; overflow: hidden; }
+#lib .grid { position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 66px; grid-column-gap: 28px; transition: transform .35s cubic-bezier(.23,1,.32,1); }
+#lib .it { position: relative; display: flex; align-items: center; padding: 0 20px 0 64px; border-radius: 999px; font: 400 34px/1 "Bagel Fat One"; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s; }
+#lib .it small { position: absolute; left: 22px; top: 50%; margin-top: -8px; font: 800 11px Archivo; letter-spacing: .06em; opacity: .6; }
+#lib .it.on { background: var(--pink); color: var(--ink); }
+#lib .shape { position: absolute; }
+
+/* ambient */
+#amb { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; z-index: 9; display: none; background: #000 center/cover no-repeat; }
+#amb.on { display: block; }
+#amb .clk { position: absolute; left: 80px; bottom: 70px; color: var(--cream); }
+#amb .clk .big { font: 400 200px/0.9 "Bagel Fat One"; letter-spacing: -.01em; }
+#amb .clk .cap { font: 800 15px Archivo; text-transform: uppercase; letter-spacing: .06em; margin-top: 14px; }
+#amb .credit { position: absolute; right: 80px; bottom: 84px; padding: 10px 18px; border-radius: 999px; background: var(--ink); color: var(--cream); font: 800 13px Archivo; text-transform: uppercase; letter-spacing: .06em; }
+#amb:after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 420px; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.55)); }
+#amb .clk, #amb .credit { z-index: 1; }
+
+#toast { position: absolute; left: 50%; bottom: 150px; z-index: 10; transform: translateX(-50%) translateY(8px); padding: 12px 22px; border-radius: 999px; background: var(--ink); color: var(--cream);
+  font: 800 14px Archivo; text-transform: uppercase; letter-spacing: .06em; opacity: 0; transition: opacity .2s, transform .3s cubic-bezier(.3,1.4,.5,1); white-space: nowrap; }
+#toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.err { background: var(--orange); }
+</style>
+</head>
+<body tabindex="-1">
+<div id="stage">
+  <canvas id="gl" width="1920" height="1080"></canvas>
+  <div id="css"></div>
+  <div class="fade"></div>
+  <canvas id="grain" width="480" height="270"></canvas>
+  <svg id="burst" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="hero"><canvas id="heroCv"></canvas></div>
+
+  <div class="hud time" id="time">--:--</div>
+  <div class="hud spec">
+    <p>Space™<br>Launcher</p>
+    <p>A field of cards<br>that never ends</p>
+    <p id="s-count">— cards<br>— inputs live</p>
+    <p id="s-date">—</p>
+  </div>
+  <div class="hud right"><b>Living room</b><span id="r-vol">Volume —</span><br><span id="r-link">Link online</span></div>
+  <div class="hud bar">
+    <div><div class="name" id="b-name">&nbsp;</div><div class="sub" id="b-sub">&nbsp;</div></div>
+    <div style="display:flex;align-items:flex-end"><span class="pills"><span class="pill fill" id="b-ok">OK to open</span><span class="pill">Arrows to fly</span></span><div class="mini" id="mini"></div></div>
+  </div>
+
+  <div id="vol"><div class="n" id="v-n">0</div><div class="t" id="v-t">Volume</div><div class="bars" id="v-bars"></div></div>
+  <div id="lib"><h2>All apps</h2><div class="meta" id="lib-meta"></div><div class="cols"><div class="grid" id="lib-grid"></div></div></div>
+  <div id="amb"><div class="clk"><div class="big" id="am-time"></div><div class="cap" id="am-date"></div></div><div class="credit" id="am-credit"></div></div>
+  <div id="toast"></div>
+</div>
+<script src="designs.js"></script>
+<script src="d6-cards.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var Q = location.search;
+  var FREEZE = /[?&]freeze=([-\d.]+),([-\d.]+),([-\d.]+),([-\d.]+)/.exec(Q);   // ?freeze=camX,camY,velX,velY (plane px)
+  var BURST = /[?&]burst=(\d+)/.exec(Q);                                     // ?burst=ms: play the select effect, pause it at ms
+  var DEMO = /[?&]demo=1/.test(Q), DEBUG = /[?&]debug=1/.test(Q), FORCE_CSS = /[?&]css=1/.test(Q);
+
+  // ---------- geometry (plane px; y down; z toward the viewer) ----------
+  var CW = 320, CH = 200, GX = 352, GY = 232, F = 1500, OX = 960, OY = 562;
+  var TILT = { x: 16 * Math.PI / 180, y: -12 * Math.PI / 180, z: -2 * Math.PI / 180 };
+  var FOCUS_LIFT = 120, FOCUS_SCALE = 1.14, FOCUS_SPIN = -2 * Math.PI / 180;
+  var TEX_SCALE = 0.8;   // cards are painted at 512x320: 1.6x their size on screen, crisp with mipmaps
+  var WALLS = [['01.jpg', 'Aoraki / Mount Cook', 'Michal Klajban'], ['02.jpg', 'Three Sisters, Canmore', 'Jakub Fryš'], ['03.jpg', 'Llyn Ogwen, Milky Way', 'John Badham'],
+    ['04.jpg', 'Aurora borealis, Estonia', 'Kristian Pikner'], ['05.jpg', 'Lake Mystery, Canterbury', 'Michal Klajban'], ['06.jpg', 'Soltan salt lake, Iran', 'Amir Pashaei'],
+    ['07.jpg', 'Sossusvlei, Namibia', 'Diego Delso'], ['08.jpg', 'Sossusvlei dunes, Namibia', 'Diego Delso'], ['09.jpg', 'Geirangerfjord, Norway', 'Ximonic (Simo Räsänen)'],
+    ['10.jpg', 'Lago do Cuniã, Brazil', 'RodrigoErse'], ['11.jpg', 'Tschierva glacier, Switzerland', 'Daniel Schwen'], ['12.jpg', 'View from Herzogenhorn', 'Jörg Braukmann'],
+    ['13.jpg', 'Westruper Heide, Haltern', 'Dietmar Rabich'], ['14.jpg', 'Volcán Pacaya, Guatemala', 'Christopher Crouzet']];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function mod(n, m) { return ((n % m) + m) % m; }
+  function pad(n) { return ('0' + n).slice(-2); }
+  function clean(n) { return String(n).replace(/[▶︎]/g, '').replace(/\s*[:.]\s*$/, '').replace(/\s*:\s.*$/, '').trim(); }
+  function nice(n) { var c = clean(n); return c === 'TV Browser' ? 'Browser' : c; }
+  function inputName(n) { return clean(n).replace(/^HDMI(\d)/i, 'HDMI $1').replace(/^AVS?$/i, 'AV').replace(/^TV Channels$/i, 'TV'); }
+  function hm(d) { return (d.getHours() % 12 || 12) + ':' + pad(d.getMinutes()); }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function smooth(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+  function api(path, done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', path, true); x.timeout = 15000;
+    x.onload = function () { var r = null; try { r = JSON.parse(x.responseText); } catch (e) {} if (path.indexOf('/api/') === 0) setLink(!!r && !r.offline); if (done) done(r); };
+    x.onerror = x.ontimeout = function () { if (path.indexOf('/api/') === 0) setLink(false); if (done) done(null); };
+    x.send();
+  }
+
+  // ---------- data ----------
+  var opened = load('opened') || {};
+  var homeNames = [], allNames = [], sources = [], onNowName = '', volume = null, muted = false;
+  var items = [], tileW = 9, tileH = 5, tileGrid = [], dataReady = false;
+
+  function buildItems() {
+    var apps = [], seen = {};
+    homeNames.concat(allNames).forEach(function (n) {
+      var k = clean(n).toLowerCase();
+      if (!k || seen[k] || /^tv channels$/.test(k) || /^hisensebar$/.test(k) || /^e-manual$/.test(k)) return;
+      seen[k] = 1; apps.push(n);
+    });
+    var list = apps.map(function (n, i) { return { kind: 'app', name: n, key: 'app:' + clean(n).toLowerCase(), index: i + 1, total: apps.length }; });
+    var ins = sources.filter(function (s) { return /^(tv|hdmi|av)/i.test(s.id); });
+    ins.forEach(function (s, i) { list.push({ kind: 'input', name: inputName(s.name), id: s.id, key: 'in:' + s.id, index: i + 1, total: ins.length, template: 'stamp' }); });
+    list.push({ kind: 'util', act: 'all', name: 'All apps', key: 'util:all', index: apps.length, total: apps.length, template: 'list' });
+    list.push({ kind: 'util', act: 'photos', name: 'Photos', key: 'util:photos', index: 1, total: WALLS.length, template: 'arch', photo: 'bg/1080s/01.jpg', sub: WALLS[0][1] });
+    list.push({ kind: 'util', act: 'settings', name: 'Settings', key: 'util:settings', index: 1, total: 1, template: 'vertical', sub: 'TV menu' });
+    var old = {}; items.forEach(function (it) { old[it.key] = it; });
+    items = list;
+    refreshItems();
+    layoutTile();
+    if (R) R.changed();
+  }
+  // live fields; a change bumps the card's version so only that texture is repainted
+  function refreshItems() {
+    var appNames = items.filter(function (i) { return i.kind === 'app'; }).map(function (i) { return clean(i.name); });
+    var liveCount = 0;
+    items.forEach(function (it) {
+      if (it.kind === 'app') { it.opened = opened[clean(it.name)] || null; it.onNow = !!onNowName && clean(it.name).toLowerCase() === onNowName; }
+      if (it.kind === 'input') { var s = sources.filter(function (x) { return x.id === it.id; })[0]; it.live = !!(s && s.signal); if (it.live) liveCount++; }
+      if (it.act === 'all') it.lines = appNames.slice(0, 5).concat(['+ ' + Math.max(0, appNames.length - 5) + ' more']);
+      it.ver = [it.opened || 0, it.onNow ? 1 : 0, it.live ? 1 : 0, (it.lines || []).join(',')].join('|');
+    });
+    var nIn = items.filter(function (i) { return i.kind === 'input'; }).length;
+    $('s-count').innerHTML = items.length + ' cards<br>' + liveCount + ' / ' + nIn + ' inputs live';
+  }
+
+  // The lattice repeats a tile of tileW x tileH cells. Cells are filled nearest-first from the origin, so the home-row
+  // apps sit around YouTube; spare cells repeat apps that differ from every neighbour, so no two neighbours match.
+  function layoutTile() {
+    var n = items.length;
+    tileW = 9; tileH = Math.max(3, Math.ceil(n / tileW));
+    var midR = Math.floor(tileH / 2), midC = Math.floor(tileW / 2), cells = [];
+    for (var r = 0; r < tileH; r++) for (var c = 0; c < tileW; c++) {
+      var lr = r - midR, lc = c - midC;
+      var x = lc * GX + (mod(lr, 2) ? GX / 2 : 0), y = lr * GY;
+      cells.push({ r: r, c: c, d: Math.sqrt(x * x * 0.8 + y * y * 1.1) + (lc + lr * 0.01) * 0.001 });
+    }
+    cells.sort(function (a, b) { return a.d - b.d; });
+    tileGrid = []; for (var i = 0; i < tileH; i++) tileGrid.push(new Array(tileW));
+    cells.forEach(function (cell, k) { if (k < n) tileGrid[cell.r][cell.c] = k; });
+    var spare = 0;
+    cells.forEach(function (cell, k) {
+      if (k < n) return;
+      for (var tries = 0; tries < n; tries++) {
+        var cand = items.length - 4 - mod(spare + tries, Math.max(1, n - 4));   // spare cells reuse apps from the far end of the list
+        if (cand < 0) cand = mod(cand, n);
+        if (!neighbourHas(cell.r, cell.c, cand)) { tileGrid[cell.r][cell.c] = cand; spare++; return; }
+      }
+      tileGrid[cell.r][cell.c] = mod(spare++, n);
+    });
+    // minimap
+    var mini = '';
+    for (var mr = 0; mr < tileH; mr++) for (var mc = 0; mc < tileW; mc++)
+      mini += '<i id="m' + mr + '_' + mc + '" style="left:' + (14 + mc * 16 + (mod(mr - midR, 2) ? 8 : 0)) + 'px;top:' + (12 + mr * Math.min(13, 86 / tileH)) + 'px"></i>';
+    $('mini').innerHTML = mini;
+    markMini();
+  }
+  function neighbourHas(r, c, idx) {
+    var odd = mod(r - Math.floor(tileH / 2), 2), d = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, odd ? 1 : -1], [1, odd ? 1 : -1]];
+    for (var i = 0; i < d.length; i++) { var v = tileGrid[mod(r + d[i][0], tileH)][mod(c + d[i][1], tileW)]; if (v === idx) return true; }
+    return false;
+  }
+  function itemAt(c, r) {
+    if (!items.length) return null;
+    var tr = mod(r + Math.floor(tileH / 2), tileH), tc = mod(c + Math.floor(tileW / 2), tileW);
+    var k = tileGrid[tr] && tileGrid[tr][tc];
+    return items[k == null ? 0 : k];
+  }
+  function cellX(c, r) { return c * GX + (mod(r, 2) ? GX / 2 : 0); }
+  function cellY(r) { return r * GY; }
+
+  // ---------- focus + camera ----------
+  var focus = { c: 0, r: 0 }, prevFocus = null, focusT = 1, stickyX = 0;
+  var cam = { x: 0, y: 0, vx: 0, vy: 0 };
+  if (FREEZE) { cam.x = +FREEZE[1]; cam.y = +FREEZE[2]; cam.vx = +FREEZE[3]; cam.vy = +FREEZE[4]; }
+
+  function setFocus(c, r) {
+    if (c === focus.c && r === focus.r) return;
+    prevFocus = { c: focus.c, r: focus.r }; focus = { c: c, r: r }; focusT = 0;
+    updateBar(); markMini();
+    if (R) R.kick();
+  }
+  function move(dc, dr) {
+    if (dr === 0) { var c = focus.c + dc; stickyX = cellX(c, focus.r); setFocus(c, focus.r); return; }
+    var r = focus.r + dr, off = mod(r, 2) ? GX / 2 : 0;
+    setFocus(Math.round((stickyX - off) / GX), r);
+  }
+  function home() { stickyX = 0; setFocus(0, 0); }
+  function focused() { return itemAt(focus.c, focus.r); }
+  function markMini() {
+    var on = document.querySelector('#mini i.on'); if (on) on.className = '';
+    var tr = mod(focus.r + Math.floor(tileH / 2), tileH), tc = mod(focus.c + Math.floor(tileW / 2), tileW), el = $('m' + tr + '_' + tc);
+    if (el) el.className = 'on';
+  }
+  function updateBar() {
+    var it = focused(); if (!it) return;
+    $('b-name').textContent = it.kind === 'app' ? nice(it.name) : it.name;
+    var sub;
+    if (it.kind === 'app') sub = (it.onNow ? 'On now' : it.opened ? D6when(it.opened) : 'Never opened') + ' · Card ' + pad(it.index) + ' / ' + it.total;
+    else if (it.kind === 'input') sub = (it.live ? 'Live signal' : 'Nothing connected') + ' · Input ' + pad(it.index) + ' / ' + it.total;
+    else sub = { all: it.total + ' apps · browse them all', photos: '14 photographs · full screen', settings: 'Opens the TV menu' }[it.act];
+    $('b-sub').textContent = sub;
+    $('b-ok').textContent = it.kind === 'input' ? 'OK to switch' : it.act === 'all' ? 'OK to browse' : it.act === 'photos' ? 'OK to view' : 'OK to open';
+  }
+  function D6when(t) {
+    var d = new Date(t), now = new Date(), day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (t >= day0) return 'Opened today at ' + hm(d) + (d.getHours() < 12 ? ' am' : ' pm');
+    if (t >= day0 - 864e5) return 'Opened yesterday';
+    if (t >= day0 - 6 * 864e5) return 'Opened ' + DAYS[d.getDay()];
+    return 'Opened ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate();
+  }
+
+  // the plane's world transform for a point; shared by the shader (same maths) and the select effect
+  function rot(p, t) {
+    var c = Math.cos(t.z), s = Math.sin(t.z), x = p[0] * c - p[1] * s, y = p[0] * s + p[1] * c, z = p[2];
+    c = Math.cos(t.y); s = Math.sin(t.y); var x2 = x * c + z * s, z2 = -x * s + z * c; x = x2; z = z2;
+    c = Math.cos(t.x); s = Math.sin(t.x); var y2 = y * c - z * s, z3 = y * s + z * c; y = y2; z = z3;
+    return [x, y, z];
+  }
+  function project(p, t) { var q = rot(p, t), w = (F - q[2]) / F; return { x: OX + q[0] / w, y: OY + q[1] / w, z: q[2], k: 1 / w }; }
+
+  // ---------- WebGL field ----------
+  var R = null;
+  function makeGL() {
+    var canvas = $('gl');
+    var opts = { alpha: true, premultipliedAlpha: true, antialias: true, depth: false, stencil: false, powerPreference: 'high-performance' };
+    var gl = canvas.getContext('webgl2', opts), gl2 = !!gl;
+    if (!gl) gl = canvas.getContext('webgl', opts) || canvas.getContext('experimental-webgl', opts);
+    if (!gl) return null;
+    var VS = [
+      'attribute vec2 aPos;',
+      'uniform vec2 uCenter;', 'uniform mediump vec2 uDim;', 'uniform float uLift;', 'uniform float uSpin;', 'uniform vec3 uRot;', 'uniform vec2 uSkew;',
+      'varying vec2 vUv;',
+      'void main() {',
+      '  vec2 l = vec2(aPos.x * uDim.x, aPos.y * uDim.y);',
+      '  float cs = cos(uSpin), sn = sin(uSpin);',
+      '  l = vec2(l.x * cs - l.y * sn, l.x * sn + l.y * cs);',
+      '  l.x += uSkew.x * aPos.y; l.y += uSkew.y * aPos.x;',          // velocity lean: cards trail like cloth
+      '  vec3 p = vec3(uCenter + l, uLift);',
+      '  float c = cos(uRot.z), s = sin(uRot.z); p = vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z);',
+      '  c = cos(uRot.y); s = sin(uRot.y); p = vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);',
+      '  c = cos(uRot.x); s = sin(uRot.x); p = vec3(p.x, p.y * c - p.z * s, p.y * s + p.z * c);',
+      '  float w = (' + F.toFixed(1) + ' - p.z) / ' + F.toFixed(1) + ';',
+      '  vec2 sc = vec2(' + OX.toFixed(1) + ', ' + OY.toFixed(1) + ') + p.xy / w;',
+      '  gl_Position = vec4((sc.x / 960.0 - 1.0) * w, (1.0 - sc.y / 540.0) * w, 0.0, w);',
+      '  vUv = aPos + 0.5;',
+      '}'].join('\n');
+    var FS = [
+      'precision mediump float;',
+      'uniform sampler2D uTex;', 'uniform float uHasTex;', 'uniform vec3 uColor;', 'uniform float uAlpha;', 'uniform mediump vec2 uDim;', 'uniform float uRad;', 'uniform float uFog;',
+      'varying vec2 vUv;',
+      'void main() {',
+      '  vec2 p = vUv * uDim;',
+      '  vec2 q = abs(p - uDim * 0.5) - (uDim * 0.5 - uRad);',
+      '  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uRad;',
+      '  float mask = 1.0 - smoothstep(-1.0, 0.8, d);',
+      '  vec3 col = uHasTex > 0.5 ? texture2D(uTex, vUv).rgb : uColor;',
+      '  col = mix(col, vec3(0.937, 0.886, 0.878), uFog);',            // distant cards soften toward the blush ground
+      '  float a = mask * uAlpha;',
+      '  gl_FragColor = vec4(col * a, a);',
+      '}'].join('\n');
+    function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+    var prog;
+    try {
+      prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+      gl.bindAttribLocation(prog, 0, 'aPos'); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    } catch (e) { if (window.console) console.warn('WebGL field unavailable:', e); return null; }
+    gl.useProgram(prog);
+    var U = {};
+    ['uCenter', 'uDim', 'uLift', 'uSpin', 'uRot', 'uSkew', 'uTex', 'uHasTex', 'uColor', 'uAlpha', 'uRad', 'uFog'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+    var SX = 6, SY = 4, verts = [], idx = [], ix, iy;
+    for (iy = 0; iy <= SY; iy++) for (ix = 0; ix <= SX; ix++) verts.push(ix / SX - 0.5, iy / SY - 0.5);
+    for (iy = 0; iy < SY; iy++) for (ix = 0; ix < SX; ix++) { var a0 = iy * (SX + 1) + ix, b0 = a0 + SX + 1; idx.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1); }
+    var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+    var ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    var COUNT = idx.length;
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+    gl.viewport(0, 0, 1920, 1080); gl.uniform1i(U.uTex, 0);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+
+    // ---------- textures: painted lazily near the camera, one per card, repainted only when its data changes ----------
+    var paper = document.createElement('canvas'), cache = {}, clock = 0, MAX_TEX = 64, fontsReady = false;
+    function upload(it, entry) {
+      D6Cards.paint(paper, it, TEX_SCALE);
+      var t = entry ? entry.tex : gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, paper);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      if (gl2) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); }
+      else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      return t;
+    }
+    function evict() {
+      var keys = Object.keys(cache); if (keys.length <= MAX_TEX) return;
+      keys.sort(function (a, b) { return cache[a].used - cache[b].used; });
+      for (var i = 0; i < keys.length - MAX_TEX; i++) { gl.deleteTexture(cache[keys[i]].tex); delete cache[keys[i]]; }
+    }
+    function rgb(hex) { var n = parseInt(hex.slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
+
+    // ---------- loop: render only while something moves ----------
+    var running = false, hidden = false, paused = false, last = 0, STIFF = 90, ZETA = 0.86;
+    function kick() { if (!running && !hidden && !paused) { running = true; last = performance.now(); requestAnimationFrame(frame); } }
+    function frame(now) {
+      if (hidden || paused) { running = false; return; }
+      var dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+      var it = focused();
+      var tx = cellX(focus.c, focus.r), ty = cellY(focus.r);
+      if (!FREEZE) {
+        var c = 2 * ZETA * Math.sqrt(STIFF), n = Math.ceil(dt / (1 / 240)), h = dt / Math.max(1, n);
+        for (var i = 0; i < n; i++) {
+          cam.vx += (STIFF * (tx - cam.x) - c * cam.vx) * h; cam.x += cam.vx * h;
+          cam.vy += (STIFF * (ty - cam.y) - c * cam.vy) * h; cam.y += cam.vy * h;
+        }
+        if (focusT < 1) focusT = Math.min(1, focusT + dt / 0.32);
+      }
+      var pending = draw();
+      var settled = Math.abs(tx - cam.x) < 0.3 && Math.abs(ty - cam.y) < 0.3 && Math.abs(cam.vx) < 2 && Math.abs(cam.vy) < 2 && focusT >= 1;
+      if (settled && !FREEZE) { cam.x = tx; cam.y = ty; cam.vx = cam.vy = 0; }
+      if (DEMO && settled) demoStep();
+      if (!settled || pending || DEMO) requestAnimationFrame(frame);
+      else { draw(); running = false; }
+    }
+    function ease(t) { return 1 - Math.pow(1 - t, 3); }
+    function draw() {
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      if (!items.length) return false;
+      // the plane leans with the camera's velocity: a softly clamped tilt, so fast flights feel like banking
+      var vx = cam.vx / 2400, vy = cam.vy / 2400;
+      vx = vx / (1 + Math.abs(vx)); vy = vy / (1 + Math.abs(vy));
+      var tilt = { x: TILT.x - vy * 0.10, y: TILT.y + vx * 0.12, z: TILT.z + vx * 0.02 };
+      gl.uniform3f(U.uRot, tilt.x, tilt.y, tilt.z);
+      var c0 = Math.round(cam.x / GX), r0 = Math.round(cam.y / GY), jobs = [];
+      var e = ease(focusT);
+      for (var r = r0 - 5; r <= r0 + 5; r++) for (var c = c0 - 6; c <= c0 + 6; c++) {
+        var px = cellX(c, r) - cam.x, py = cellY(r) - cam.y;
+        var dist = Math.sqrt(px * px / (GX * GX) * 0.55 + py * py / (GY * GY));
+        if (dist > 5.4) continue;
+        var isF = c === focus.c && r === focus.r, isP = prevFocus && c === prevFocus.c && r === prevFocus.r;
+        var f = isF ? e : isP ? 1 - e : 0;
+        var lift = -dist * 70 + Math.sin(c * 1.7 + r * 2.3) * 40;
+        lift = lift * (1 - f) + FOCUS_LIFT * f;
+        // cards lag behind the camera a little, more the further out they are: the field feels fluid, not rigid
+        var lag = 0.016 * (0.5 + dist * 0.18);
+        var cx = px + cam.vx * lag * (1 - f), cy = py + cam.vy * lag * (1 - f);
+        var p = project([cx, cy, lift], tilt);
+        if (p.x < -400 || p.x > 2320 || p.y < -320 || p.y > 1400) continue;
+        jobs.push({ c: c, r: r, cx: cx, cy: cy, lift: lift, f: f, dist: dist, z: p.z, focus: isF });
+      }
+      jobs.sort(function (a, b) { return a.z - b.z; });   // far first
+      var painted = 0, pending = false, budget = (!FREEZE && Math.abs(cam.vx) + Math.abs(cam.vy) > 600) ? 1 : 4;
+      if (!fontsReady) budget = 0;
+      jobs.forEach(function (j) {
+        var it = itemAt(j.c, j.r); j.it = it;
+        var en = cache[it.key];
+        if ((!en || en.ver !== it.ver) && painted < budget) { var t = upload(it, en); en = cache[it.key] = { tex: t, used: 0, ver: it.ver }; painted++; }
+        if (!en || en.ver !== it.ver) pending = true;
+        if (en) en.used = ++clock;
+        j.en = en;
+      });
+      evict();
+      var skx = Math.max(-26, Math.min(26, -cam.vx * 0.009)), sky = Math.max(-10, Math.min(10, -cam.vy * 0.004));
+      for (var i = 0; i < jobs.length; i++) {
+        var j = jobs[i];
+        if (j.focus && selecting) continue;   // the selected card has flown out of the field
+        var s = 1 + (FOCUS_SCALE - 1) * j.f, w = CW * s, h = CH * s, spin = FOCUS_SPIN * j.f;
+        var fog = smooth(2.2, 5.0, j.dist) * 0.55 * (1 - j.f), alpha = 1 - smooth(4.4, 5.4, j.dist);
+        gl.uniform1f(U.uLift, j.lift); gl.uniform1f(U.uSpin, spin);
+        gl.uniform2f(U.uSkew, skx * (1 - j.f), sky * (1 - j.f));
+        gl.uniform1f(U.uHasTex, 0); gl.uniform3f(U.uColor, 0.169, 0.165, 0.165); gl.uniform1f(U.uFog, fog);
+        // flat offset shadow (thin for the field, a solid charcoal slab under the focused card)
+        var sh = 7 + 7 * j.f, grow = 10 * j.f;
+        gl.uniform2f(U.uCenter, j.cx + sh, j.cy + sh + 1 + 1 * j.f); gl.uniform2f(U.uDim, w + grow, h + grow); gl.uniform1f(U.uRad, 16 * s + grow / 2);
+        gl.uniform1f(U.uAlpha, (0.10 + 0.90 * j.f) * alpha); gl.drawElements(gl.TRIANGLES, COUNT, gl.UNSIGNED_SHORT, 0);
+        // outline: a hairline for every card, a thick charcoal frame for the focused one
+        gl.uniform2f(U.uCenter, j.cx, j.cy); gl.uniform2f(U.uDim, w + 3 + grow, h + 3 + grow); gl.uniform1f(U.uRad, 16 * s + 1.5 + grow / 2);
+        gl.uniform1f(U.uAlpha, (0.16 + 0.84 * j.f) * alpha); gl.drawElements(gl.TRIANGLES, COUNT, gl.UNSIGNED_SHORT, 0);
+        // the card
+        gl.uniform2f(U.uDim, w, h); gl.uniform1f(U.uRad, 16 * s); gl.uniform1f(U.uAlpha, alpha);
+        if (j.en) { gl.uniform1f(U.uHasTex, 1); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, j.en.tex); }
+        else { var col = rgb(D6Cards.identity(j.it).bg); gl.uniform3f(U.uColor, col[0], col[1], col[2]); }
+        gl.drawElements(gl.TRIANGLES, COUNT, gl.UNSIGNED_SHORT, 0);
+      }
+      lastTilt = tilt;
+      return pending;
+    }
+    document.addEventListener('visibilitychange', function () { hidden = document.hidden; if (!hidden) kick(); });
+    return {
+      kick: kick,
+      changed: kick,
+      fonts: function () { fontsReady = true; kick(); },
+      paused: function (on) { paused = on; if (!on) kick(); },
+      redraw: function () { draw(); },
+      debug: function () { return { tex: Object.keys(cache).length, running: running, cam: [Math.round(cam.x), Math.round(cam.y)], gl2: gl2 }; }
+    };
+  }
+  var lastTilt = TILT, selecting = false;
+
+  // ---------- CSS fallback: the same field as DOM canvases on a 3D plane ----------
+  function makeCSS() {
+    var root = $('css'), plane = document.createElement('div'); plane.className = 'plane'; root.appendChild(plane);
+    root.style.display = 'block'; $('gl').style.display = 'none';
+    var pool = {}, fontsReady = false, running = false;
+    function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+    var last = performance.now();
+    function frame(now) {
+      var dt = Math.min(0.05, (now - last) / 1000); last = now;
+      var tx = cellX(focus.c, focus.r), ty = cellY(focus.r), k = 90, c = 2 * 0.86 * Math.sqrt(k);
+      cam.vx += (k * (tx - cam.x) - c * cam.vx) * dt; cam.x += cam.vx * dt;
+      cam.vy += (k * (ty - cam.y) - c * cam.vy) * dt; cam.y += cam.vy * dt;
+      plane.style.transform = 'rotateX(16deg) rotateY(-12deg) rotateZ(-2deg) translate(' + (-cam.x) + 'px,' + (-cam.y) + 'px)';
+      layout();
+      var settled = Math.abs(tx - cam.x) < 0.5 && Math.abs(ty - cam.y) < 0.5 && Math.abs(cam.vx) + Math.abs(cam.vy) < 4;
+      if (!settled) requestAnimationFrame(frame); else running = false;
+    }
+    function layout() {
+      var c0 = Math.round(cam.x / GX), r0 = Math.round(cam.y / GY), keep = {};
+      for (var r = r0 - 4; r <= r0 + 4; r++) for (var c = c0 - 5; c <= c0 + 5; c++) {
+        var id = c + ',' + r, it = itemAt(c, r); keep[id] = 1;
+        var el = pool[id];
+        if (!el) { el = pool[id] = document.createElement('div'); el.className = 'c'; el.appendChild(document.createElement('canvas')); plane.appendChild(el); }
+        if (fontsReady && el._ver !== it.key + it.ver) { D6Cards.paint(el.firstChild, it, TEX_SCALE); el._ver = it.key + it.ver; }
+        var isF = c === focus.c && r === focus.r;
+        el.className = 'c' + (isF ? ' on' : '');
+        el.style.left = cellX(c, r) + 'px'; el.style.top = cellY(r) + 'px';
+        el.style.transform = isF ? 'translateZ(120px) scale(1.14) rotateZ(-2deg)' : 'translateZ(' + (Math.sin(c * 1.7 + r * 2.3) * 40) + 'px)';
+        el.style.visibility = (isF && selecting) ? 'hidden' : '';
+      }
+      for (var id2 in pool) if (!keep[id2]) { plane.removeChild(pool[id2]); delete pool[id2]; }
+    }
+    return { kick: kick, changed: function () { layout(); kick(); }, fonts: function () { fontsReady = true; layout(); }, paused: function () {}, redraw: layout, debug: function () { return { css: true }; } };
+  }
+
+  // ---------- select: the card flies forward, the field recedes, shapes burst out ----------
+  var SHAPES = [
+    [-152, 560, 'ring', 70], [-118, 640, 'cross', 80], [-80, 600, 'pills', 70], [-40, 700, 'half', 60], [-8, 640, 'scallop', 56],
+    [28, 690, 'ring', 54], [62, 600, 'cross', 66], [98, 660, 'pills', 64], [132, 620, 'scallop', 60], [168, 700, 'half', 70],
+    [-172, 760, 'cross', 48], [-60, 820, 'ring', 40], [10, 860, 'cross', 40], [80, 820, 'ring', 46], [150, 860, 'pills', 46],
+    [200, 600, 'ring', 62], [-200, 640, 'scallop', 52], [240, 780, 'cross', 52], [-240, 820, 'half', 50]];
+  var COLS = ['#2c6bb5', '#1e8c6c', '#f0a32e', '#ea6232', '#f2a2ad', '#2b2a2a'];
+  function shapeSVG(kind, s, col) {
+    if (kind === 'ring') return '<circle r="' + (s * 0.4) + '" fill="none" stroke="' + col + '" stroke-width="' + (s * 0.3) + '"/>';
+    if (kind === 'cross') { var a = s * 0.36; return '<rect x="' + (-a / 2) + '" y="' + (-s / 2) + '" width="' + a + '" height="' + s + '" rx="' + (a * .28) + '" fill="' + col + '"/><rect x="' + (-s / 2) + '" y="' + (-a / 2) + '" width="' + s + '" height="' + a + '" rx="' + (a * .28) + '" fill="' + col + '"/>'; }
+    if (kind === 'pills') { var h = s * 0.22, o = ''; for (var i = 0; i < 3; i++) o += '<rect x="' + (-s / 2 + i * h * .6) + '" y="' + (-s / 2 + i * h * 1.3) + '" width="' + s + '" height="' + h + '" rx="' + h / 2 + '" fill="' + col + '"/>'; return o; }
+    if (kind === 'half') return '<path d="M ' + (-s / 2) + ' 0 A ' + s / 2 + ' ' + s / 2 + ' 0 0 1 ' + s / 2 + ' 0 Z" fill="' + col + '"/>';
+    var d = ''; for (var j = 0; j <= 90; j++) { var t = j / 90 * Math.PI * 2, r = s / 2 + Math.sin(t * 9) * s * 0.045; d += (j ? 'L' : 'M') + (Math.cos(t) * r).toFixed(1) + ' ' + (Math.sin(t) * r).toFixed(1); }
+    return '<path d="' + d + 'Z" fill="' + col + '"/>';
+  }
+  function burst(seed) {
+    var svg = $('burst'), html = '', anims = [];
+    SHAPES.forEach(function (s, i) {
+      var a = (s[0] - 90 + seed * 23) * Math.PI / 180, R = s[1], col = COLS[(i + seed) % COLS.length];
+      var fx = 960 + Math.cos(a) * R * 1.25, fy = 540 + Math.sin(a) * R * 0.86;
+      if ((fx < 360 && fy < 400) || (fx < 700 && fy > 900) || (fx > 1560 && fy < 180) || (fx > 1500 && fy > 940)) return;
+      for (var t = 2; t >= 0; t--) html += '<g data-i="' + i + '" data-t="' + t + '" data-a="' + a + '" data-r="' + R + '" data-rot="' + (i * 37) + '">' + shapeSVG(s[2], s[3], col) + '</g>';
+    });
+    svg.innerHTML = html;
+    var gs = svg.querySelectorAll('g');
+    for (var k = 0; k < gs.length; k++) {
+      var g = gs[k], t = +g.getAttribute('data-t'), a = +g.getAttribute('data-a'), R = +g.getAttribute('data-r') - t * 34, rot0 = +g.getAttribute('data-rot');
+      var x = 960 + Math.cos(a) * R * 1.25, y = 540 + Math.sin(a) * R * 0.86, op = t === 0 ? 1 : 0.22 / t;
+      var x0 = 960 + Math.cos(a) * 140, y0 = 540 + Math.sin(a) * 100;
+      g.style.transformBox = 'view-box';
+      anims.push(g.animate([
+        { transform: 'translate(' + x0 + 'px,' + y0 + 'px) rotate(' + (rot0 - 90) + 'deg) scale(.2)', opacity: 0 },
+        { transform: 'translate(' + x + 'px,' + y + 'px) rotate(' + (rot0 + t * 8) + 'deg) scale(1)', opacity: op, offset: 0.42 },
+        { transform: 'translate(' + (x + (x - 960) * 0.08) + 'px,' + (y + (y - 540) * 0.08) + 'px) rotate(' + (rot0 + t * 8 + 12) + 'deg) scale(1)', opacity: 0 }
+      ], { duration: 1400, delay: 40 + t * 50, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'both' }));
+    }
+    return anims;
+  }
+  var selectTimer = 0;
+  function select() {
+    var it = focused(); if (!it || selecting) return;
+    if (it.act === 'all') { openLib(true); return; }   // the library opens in place, no launch
+    selecting = true;
+    document.body.classList.add('selecting');
+    // the hero starts where the focused card sits on screen, tilted like the plane, and flies to face you
+    var p = project([cellX(focus.c, focus.r) - cam.x, cellY(focus.r) - cam.y, FOCUS_LIFT], lastTilt);
+    var cv = $('heroCv'); D6Cards.paint(cv, it, 2);
+    var hero = $('hero'), s0 = (CW * FOCUS_SCALE * p.k) / 1040;
+    hero.style.display = 'block';
+    var heroAnim = hero.animate([
+      { transform: 'translate(' + (p.x - 520) + 'px,' + (p.y - 325) + 'px) perspective(1600px) rotateX(16deg) rotateY(-12deg) rotateZ(-4deg) scale(' + s0 + ')' },
+      { transform: 'translate(' + (960 - 520) + 'px,' + (530 - 325) + 'px) perspective(1600px) rotateX(5deg) rotateY(-9deg) rotateZ(-1.5deg) scale(1.02)', offset: 0.7 },
+      { transform: 'translate(' + (960 - 520) + 'px,' + (530 - 325) + 'px) perspective(1600px) rotateX(5deg) rotateY(-9deg) rotateZ(-1.5deg) scale(1)' }
+    ], { duration: 720, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'both' });
+    burst(focus.c * 3 + focus.r);
+    $('b-name').textContent = (it.kind === 'input' ? 'Switching to ' : it.act === 'photos' ? 'Opening ' : it.act === 'settings' ? 'Opening ' : 'Opening ') + (it.kind === 'app' ? nice(it.name) : it.name);
+    $('b-sub').textContent = 'The card jumps forward · the field scatters into shapes';
+    if (R) R.redraw();
+    if (BURST) {   // test hook: freeze the effect at a moment
+      var at = +BURST[1];
+      setTimeout(function () { document.getAnimations().forEach(function (a) { a.pause(); a.currentTime = Math.max(0, at - ((a.effect && a.effect.getTiming().delay) || 0) * 0); }); }, 50);
+      return;
+    }
+    clearTimeout(selectTimer);
+    selectTimer = setTimeout(function () { act(it); }, 620);
+    setTimeout(function () { endSelect(heroAnim); }, it.act === 'photos' ? 900 : 1700);
+  }
+  function endSelect(heroAnim) {
+    selecting = false;
+    document.body.classList.remove('selecting');
+    var hero = $('hero');
+    var fade = hero.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
+    fade.onfinish = function () { hero.style.display = 'none'; fade.cancel(); if (heroAnim) heroAnim.cancel(); };
+    $('burst').innerHTML = '';
+    updateBar();
+    if (R) R.kick();
+  }
+  function act(it) {
+    if (it.kind === 'app') {
+      opened[clean(it.name)] = Date.now(); save('opened', opened); refreshItems(); if (R) R.changed();
+      api('/api/launch?name=' + encodeURIComponent(it.name), function (r) { if (!r || !r.ok) toast('Couldn’t open ' + nice(it.name), true); });
+    } else if (it.kind === 'input') {
+      api('/api/source?id=' + encodeURIComponent(it.id), function (r) { if (!r || !r.ok) toast('Couldn’t switch input', true); });
+    } else if (it.act === 'photos') setAmbient(true);
+    else if (it.act === 'settings') api('/api/key?k=KEY_MENU');
+  }
+
+  // ---------- library (All apps) ----------
+  var lib = { on: false, i: 0, names: [] };
+  function openLib(on) {
+    lib.on = on; $('lib').className = on ? 'on' : '';
+    if (!on) return;
+    lib.names = items.filter(function (x) { return x.kind === 'app'; });
+    lib.i = 0;
+    $('lib-meta').innerHTML = lib.names.length + ' apps<br>Arrows to move · OK to open · Back to close';
+    $('lib-grid').innerHTML = lib.names.map(function (x, i) { return '<div class="it" data-i="' + i + '"><small>' + pad(i + 1) + '</small>' + nice(x.name) + '</div>'; }).join('');
+    libFocus(0);
+  }
+  function libFocus(i) {
+    var n = lib.names.length; if (!n) return;
+    lib.i = Math.max(0, Math.min(n - 1, i));
+    var els = $('lib-grid').children;
+    for (var k = 0; k < els.length; k++) els[k].className = 'it' + (k === lib.i ? ' on' : '');
+    var row = Math.floor(lib.i / 4), rowsVisible = Math.floor(800 / 66), top = Math.max(0, row - rowsVisible + 2);
+    $('lib-grid').style.transform = 'translateY(' + (-top * 66) + 'px)';
+  }
+
+  // ---------- ambient ----------
+  var ambOn = false, wall = +(load('wall') || 0) % WALLS.length;
+  function setAmbient(on) {
+    ambOn = on; $('amb').className = on ? 'on' : '';
+    if (on) { $('amb').style.backgroundImage = 'url(bg/1080s/' + WALLS[wall][0] + ')'; $('am-credit').textContent = WALLS[wall][1] + ' · ' + WALLS[wall][2]; tick(); }
+    if (R) R.paused(on);
+  }
+
+  // ---------- volume ----------
+  var volTimer = 0;
+  function showVolume() {
+    $('v-n').textContent = muted ? '—' : String(volume);
+    $('v-t').textContent = muted ? 'Muted' : 'Volume';
+    var lit = muted || volume == null ? 0 : Math.round(volume / 10), h = '';
+    for (var i = 0; i < 10; i++) h += '<i' + (i < lit ? ' class="f"' : '') + '></i>';
+    $('v-bars').innerHTML = h;
+    $('vol').className = 'on';
+    clearTimeout(volTimer); volTimer = setTimeout(function () { $('vol').className = ''; }, 2200);
+  }
+  function setVolumeText() { $('r-vol').textContent = muted ? 'Muted' : 'Volume ' + (volume == null ? '—' : volume); }
+  function pollVolume() {
+    api('/api/volume', function (r) {
+      if (!r || !r.ok || !r.data || r.data.volume_value == null) return;
+      var v = +r.data.volume_value, m = !!r.data.muted, changed = volume !== null && (v !== volume || m !== muted);
+      volume = v; muted = m; setVolumeText();
+      if (changed) showVolume();
+    });
+  }
+  function nudgeVolume(d) {
+    if (volume == null) return;
+    volume = Math.max(0, Math.min(100, volume + d)); muted = false; setVolumeText(); showVolume();
+    api('/api/set_volume?v=' + volume);
+  }
+
+  // ---------- small things ----------
+  var linkOk = true;
+  function setLink(ok) { if (ok === linkOk) return; linkOk = ok; $('r-link').textContent = ok ? 'Link online' : 'Link offline'; $('r-link').className = ok ? '' : 'off'; }
+  var toastTimer = 0;
+  function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'on' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, 2400); }
+  function tick() {
+    var d = new Date(), date = DAYS[d.getDay()] + '<br>' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+    $('time').textContent = hm(d); $('s-date').innerHTML = date;
+    if (ambOn) { $('am-time').textContent = hm(d); $('am-date').textContent = DAYS[d.getDay()] + ' · ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+  }
+  function grain() {
+    var g = $('grain'), x = g.getContext('2d'), im = x.createImageData(480, 270);
+    for (var i = 0; i < im.data.length; i += 4) { var v = 200 + Math.random() * 55; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = Math.random() < 0.5 ? 26 : 0; }
+    x.putImageData(im, 0, 0);
+  }
+  var demoN = 0;
+  function demoStep() { var seq = [[1, 0], [1, 0], [0, 1], [-1, 0], [0, -1], [0, -1], [1, 0]]; var s = seq[demoN++ % seq.length]; move(s[0], s[1]); }
+
+  // ---------- input ----------
+  var repeatAt = 0, holdStart = 0;
+  function keyName(e) {
+    var alias = { Left: 'ArrowLeft', Right: 'ArrowRight', Up: 'ArrowUp', Down: 'ArrowDown', Select: 'Enter', OK: 'Enter', Accept: 'Enter', GoBack: 'Escape', Back: 'Escape', BrowserBack: 'Escape' };
+    if (alias[e.key]) return alias[e.key];
+    switch (e.keyCode || e.which) {
+      case 37: return 'ArrowLeft'; case 38: return 'ArrowUp'; case 39: return 'ArrowRight'; case 40: return 'ArrowDown';
+      case 13: case 23: case 66: return 'Enter';
+      case 27: case 8: case 461: case 10009: return 'Escape';
+      case 447: return 'AudioVolumeUp'; case 448: return 'AudioVolumeDown'; case 449: return 'AudioVolumeMute';
+    }
+    return e.key;
+  }
+  window.addEventListener('keydown', function (e) {
+    var k = keyName(e);
+    if (k === 'AudioVolumeUp' || k === 'AudioVolumeDown' || k === 'AudioVolumeMute') {
+      e.preventDefault();
+      if (k === 'AudioVolumeMute') { muted = !muted; setVolumeText(); showVolume(); api('/api/key?k=KEY_MUTE'); }
+      else nudgeVolume(k === 'AudioVolumeUp' ? 2 : -2);
+      return;
+    }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape'].indexOf(k) < 0) return;
+    e.preventDefault();
+    if (ambOn) { setAmbient(false); return; }
+    if (lib.on) {
+      if (k === 'Escape') openLib(false);
+      else if (k === 'ArrowLeft') libFocus(lib.i - 1); else if (k === 'ArrowRight') libFocus(lib.i + 1);
+      else if (k === 'ArrowUp') libFocus(lib.i - 4); else if (k === 'ArrowDown') libFocus(lib.i + 4);
+      else if (k === 'Enter' && !e.repeat) { var it = lib.names[lib.i]; if (it) { toast('Opening ' + nice(it.name)); act(it); } }
+      return;
+    }
+    if (selecting) return;
+    if (k === 'Escape') { home(); return; }
+    if (k === 'Enter') { if (!e.repeat) select(); return; }
+    // holding an arrow speeds up: repeats are accepted faster the longer the key is held
+    var now = performance.now();
+    if (!e.repeat) holdStart = now;
+    var gap = e.repeat ? (now - holdStart > 700 ? 70 : 130) : 0;
+    if (now - repeatAt < gap) return;
+    repeatAt = now;
+    if (k === 'ArrowLeft') move(-1, 0); else if (k === 'ArrowRight') move(1, 0);
+    else if (k === 'ArrowUp') move(0, -1); else if (k === 'ArrowDown') move(0, 1);
+  });
+  document.addEventListener('click', function () { if (ambOn) setAmbient(false); });
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080), st = $('stage');
+    st.style.transform = 'scale(' + s + ')';
+    st.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px'; st.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+
+  // ---------- start ----------
+  window.addEventListener('resize', fit); fit(); grain(); tick(); setInterval(tick, 1000);
+  R = FORCE_CSS ? null : makeGL();
+  if (!R) R = makeCSS();
+  var got = 0;
+  function gotOne() {
+    if (++got < 3) return;
+    buildItems(); updateBar(); dataReady = true;
+    if (BURST) setTimeout(select, 900);
+    if (/[?&]lib=1/.test(Q)) openLib(true);
+    if (/[?&]amb=1/.test(Q)) setAmbient(true);
+  }
+  function req(path, cb, tries) { api(path, function (r) { if ((!r || !r.ok) && tries > 0) setTimeout(function () { req(path, cb, tries - 1); }, 800); else cb(r); }); }
+  api('icons/index.json', function (icons) {
+    D6Cards.ready(icons || {}, ['bg/1080s/01.jpg']).then(function () { R.fonts(); if (dataReady) R.changed(); });
+  });
+  req('/api/apps', function (r) { homeNames = r && r.ok ? r.data : []; gotOne(); }, 3);
+  req('/api/apps?all=1', function (r) { allNames = r && r.ok ? r.data : []; gotOne(); }, 3);
+  req('/api/sources', function (r) { sources = r && r.ok ? r.data : []; gotOne(); }, 3);
+  pollVolume(); setInterval(pollVolume, 1500);
+  function pollState() {
+    api('/api/state', function (r) {
+      if (!r || !r.ok || !r.data) return;
+      var s = r.data, name = s.statetype === 'app' && !/hisensebar/i.test(s.name || '') ? clean(s.name).toLowerCase() : '';
+      if (name !== onNowName) { onNowName = name; if (items.length) { refreshItems(); updateBar(); R.changed(); } }
+    });
+  }
+  pollState(); setInterval(pollState, 3000);
+  setInterval(function () { api('/api/sources', function (r) { if (r && r.ok && r.data && JSON.stringify(r.data) !== JSON.stringify(sources)) { sources = r.data; refreshItems(); R.changed(); } }); }, 20000);
+  if (DEBUG) setInterval(function () { document.title = JSON.stringify(R.debug()); }, 1000);
+  document.body.focus();
+})();
+</script>
+</body>
+</html>

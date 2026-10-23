@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Space mockup</title>
+<style>
+@font-face { font-family: "Bagel Fat One"; src: url(fonts/BagelFatOne.woff2) format("woff2"); }
+@font-face { font-family: "Archivo Black"; src: url(fonts/ArchivoBlack.woff2) format("woff2"); }
+@font-face { font-family: Archivo; src: url(fonts/Archivo-700.woff2) format("woff2"); font-weight: 700; }
+@font-face { font-family: Archivo; src: url(fonts/Archivo-800.woff2) format("woff2"); font-weight: 800; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #efe2e0; }
+body { font-family: Archivo, sans-serif; color: #2b2a2a; }
+#stage { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; overflow: hidden; background: #efe2e0; }
+/* faint print grid on the ground, like the charcoal spreads of the reference but on blush */
+#stage:before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background-image: linear-gradient(rgba(43,42,42,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(43,42,42,.05) 1px, transparent 1px);
+  background-size: 32px 32px; }
+.world { position: absolute; left: 50%; top: 52%; width: 0; height: 0; perspective: 1500px; perspective-origin: 0 0; }
+.plane { position: absolute; transform-style: preserve-3d; transform: rotateX(16deg) rotateY(-12deg) rotateZ(-2deg); }
+.card { position: absolute; width: 320px; height: 200px; margin: -100px 0 0 -160px; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 0 0 1.5px rgba(43,42,42,.16), 7px 8px 0 rgba(43,42,42,.10); }
+.card canvas { display: block; width: 320px; height: 200px; }
+.card.focus { overflow: visible; box-shadow: none; }
+.card.focus canvas { border-radius: 16px; box-shadow: 0 0 0 5px #2b2a2a, 14px 16px 0 5px #2b2a2a; }
+.fade { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 56% at 50% 52%, rgba(239,226,224,0) 38%, rgba(239,226,224,.86) 76%, #efe2e0 96%),
+    linear-gradient(180deg, rgba(239,226,224,0) 74%, rgba(239,226,224,.95) 92%),
+    linear-gradient(90deg, rgba(239,226,224,.92) 0, rgba(239,226,224,0) 16%); }
+.hud { position: absolute; z-index: 5; }
+.time { left: 72px; top: 52px; font: 400 92px/1 "Bagel Fat One"; letter-spacing: -.01em; }
+.spec { left: 76px; top: 170px; font: 800 13px/1.45 Archivo; text-transform: uppercase; letter-spacing: .05em; }
+.spec p + p { margin-top: 12px; }
+.right { right: 72px; top: 60px; text-align: right; font: 800 13px/1.45 Archivo; text-transform: uppercase; letter-spacing: .05em; }
+.right b { display: block; font: 400 30px/1 "Archivo Black"; letter-spacing: -.01em; margin-bottom: 8px; text-transform: none; }
+.bar { left: 72px; right: 72px; bottom: 44px; display: flex; align-items: flex-end; justify-content: space-between; }
+.bar .name { font: 400 76px/0.95 "Bagel Fat One"; }
+.bar .sub { font: 800 13px Archivo; text-transform: uppercase; letter-spacing: .06em; margin-top: 12px; }
+.pill { display: inline-block; padding: 8px 16px; border: 2px solid #2b2a2a; border-radius: 999px; font: 800 13px Archivo; text-transform: uppercase; letter-spacing: .06em; margin-left: 10px; }
+.pill.fill { background: #2b2a2a; color: #f6ede7; }
+.mini { position: relative; width: 168px; height: 110px; border-radius: 14px; background: #2b2a2a; margin-left: 28px; }
+.mini i { position: absolute; width: 12px; height: 8px; border-radius: 2px; background: #4a4848; }
+.mini i.on { background: #f2a2ad; }
+.tag { left: 50%; top: 40px; transform: translateX(-50%); padding: 9px 18px; border-radius: 999px; background: #2b2a2a; color: #f6ede7; font: 800 13px Archivo; text-transform: uppercase; letter-spacing: .06em; }
+/* frame B */
+.b .plane { filter: blur(5px); opacity: .5; transform: rotateX(16deg) rotateY(-12deg) rotateZ(-2deg) translateZ(-260px); }
+.hero { position: absolute; left: 50%; top: 50%; width: 1040px; height: 650px; margin: -325px 0 0 -520px; z-index: 4;
+  transform: perspective(1600px) rotateY(-9deg) rotateX(5deg) rotateZ(-1.5deg); }
+.hero canvas { width: 1040px; height: 650px; border-radius: 40px; display: block; box-shadow: 0 0 0 8px #2b2a2a, 26px 30px 0 8px #2b2a2a; }
+.burst { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; z-index: 3; }
+.b .bar .name { font-size: 58px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="d6-cards.js"></script>
+<script>
+(function () {
+  var frameB = /frame=b/.test(location.search), day = 864e5, now = Date.now();
+  var FALLBACK = ['YouTube', 'Netflix', 'Prime Video', 'DStv Now', 'Spotify : Music & Podcasts', 'UEFA.tv', 'DAZN', 'Red Bull TV', 'DEEZER', 'NBA', 'MUBI', 'UFC',
+    'StarTimes ON', 'Stremio Lite', 'TV Browser', 'Plex', 'APP STORE', 'Kidoodle TV', 'MBC Shahid', 'Haystack TV Local + World News', 'Mindset', 'iWant'];
+  var OPENED = { 'YouTube': now - 3 * 3600e3, 'Netflix': now - day * 1.2, 'DEEZER': now - day * 2, 'Spotify : Music & Podcasts': now - day * 3 };
+  function get(url) { return fetch(url).then(function (r) { return r.json(); }).catch(function () { return null; }); }
+
+  Promise.all([get('icons/index.json'), get('/api/apps?all=1')]).then(function (res) {
+    var names = res[1] && res[1].ok ? res[1].data.filter(function (n) { return !/^tv channels/i.test(n); }) : FALLBACK;
+    var total = names.length;
+    var items = names.map(function (n, i) { return { kind: 'app', name: n, index: i + 1, total: total, opened: OPENED[n] || null }; });
+    items.splice(5, 0, { kind: 'input', name: 'HDMI 1', index: 2, total: 6, live: true, template: 'stamp' });
+    items.splice(9, 0, { kind: 'util', name: 'All apps', index: total, total: total, template: 'list', lines: ['YouTube', 'Netflix', 'Prime Video', 'DStv Now', 'Spotify', '+ ' + (total - 5) + ' more'] });
+    items.splice(14, 0, { kind: 'util', name: 'Photos', index: 1, total: 14, template: 'arch', photo: 'bg/1080s/01.jpg' });
+    items.splice(20, 0, { kind: 'util', name: 'Settings', index: 1, total: 1, template: 'vertical', sub: 'TV menu' });
+    return D6Cards.ready(res[0], ['bg/1080s/01.jpg']).then(function () { build(items); });
+  });
+
+  function build(items) {
+    var stage = document.getElementById('stage');
+    if (frameB) stage.className = 'b';
+    var world = document.createElement('div'); world.className = 'world';
+    var plane = document.createElement('div'); plane.className = 'plane'; world.appendChild(plane);
+    var gx = 352, gy = 232, k = 0;
+    var fi = 0; for (var q = 0; q < items.length; q++) if (/^youtube$/i.test(items[q].name)) fi = q;
+    var focusItem = items[fi], rest = items.filter(function (_, q) { return q !== fi; });
+    for (var r = -3; r <= 3; r++) for (var c = -4; c <= 4; c++) {
+      var focus = r === 0 && c === 0;
+      var it = focus ? focusItem : rest[(k++ * 7 + 3) % rest.length];
+      var dist = Math.sqrt(c * c * 0.55 + r * r);
+      var z = focus ? 120 : -dist * 70 + Math.sin(c * 1.7 + r * 2.3) * 40;
+      var el = document.createElement('div'); el.className = 'card' + (focus ? ' focus' : '');
+      el.style.left = (c * gx + (r % 2 ? gx / 2 : 0)) + 'px'; el.style.top = (r * gy) + 'px';
+      el.style.transform = 'translateZ(' + z + 'px)' + (focus ? ' scale(1.14) rotateZ(-2deg)' : '');
+      var cv = document.createElement('canvas'); D6Cards.paint(cv, it, 1); el.appendChild(cv);
+      plane.appendChild(el);
+    }
+    stage.appendChild(world);
+    var fade = document.createElement('div'); fade.className = 'fade'; stage.appendChild(fade);
+
+    var hud = '<div class="hud time">12:58</div>' +
+      '<div class="hud spec"><p>Space™<br>Launcher</p><p>A field of cards<br>that never ends</p><p>+' + items.length + ' cards<br>+6 inputs</p><p>Friday<br>23 October</p></div>' +
+      '<div class="hud right"><b>Living room</b>Volume 13<br>Link online</div>';
+    if (!frameB) {
+      var mini = '<div class="mini">';
+      for (var y = 0; y < 7; y++) for (var x = 0; x < 9; x++) mini += '<i class="' + (x === 4 && y === 3 ? 'on' : '') + '" style="left:' + (14 + x * 16) + 'px;top:' + (12 + y * 13) + 'px"></i>';
+      mini += '</div>';
+      hud += '<div class="hud bar"><div><div class="name">YouTube</div><div class="sub">Card ' + ('0' + focusItem.index).slice(-2) + ' / ' + focusItem.total + ' · OK to open</div></div>' +
+        '<div style="display:flex;align-items:flex-end"><span class="pill fill">OK to open</span><span class="pill">Arrows to fly</span>' + mini + '</div></div>' +
+        '<div class="hud tag">Frame A · browsing</div>';
+    } else {
+      var hero = document.createElement('div'); hero.className = 'hero';
+      var big = document.createElement('canvas'); D6Cards.paint(big, focusItem, 1.625); hero.appendChild(big);
+      stage.appendChild(burst()); stage.appendChild(hero);
+      hud += '<div class="hud bar"><div><div class="name">Opening YouTube</div><div class="sub">The card jumps forward · the field scatters into shapes</div></div><span class="pill fill">Hold on</span></div>' +
+        '<div class="hud tag">Frame B · selecting</div>';
+    }
+    stage.insertAdjacentHTML('beforeend', hud);
+    document.title = 'Space mockup · ready';
+  }
+
+  // Flat retro shapes flying out from behind the card, each with two fading copies as a motion trail.
+  function burst() {
+    var cols = ['#2c6bb5', '#1e8c6c', '#f0a32e', '#ea6232', '#f2a2ad', '#2b2a2a'];
+    var svg = '<svg class="burst" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">';
+    var shapes = [
+      [-152, 560, 'ring', 70], [-118, 640, 'cross', 80], [-80, 600, 'pills', 70], [-40, 700, 'half', 60], [-8, 640, 'scallop', 56],
+      [28, 690, 'ring', 54], [62, 600, 'cross', 66], [98, 660, 'pills', 64], [132, 620, 'scallop', 60], [168, 700, 'half', 70],
+      [-172, 760, 'cross', 48], [-60, 820, 'ring', 40], [10, 860, 'cross', 40], [80, 820, 'ring', 46], [150, 860, 'pills', 46],
+      [200, 600, 'ring', 62], [-200, 640, 'scallop', 52], [240, 780, 'cross', 52], [-240, 820, 'half', 50]
+    ];
+    shapes.forEach(function (s, i) {
+      var a = (s[0] - 90) * Math.PI / 180, R = s[1], size = s[3], col = cols[i % cols.length];
+      var fx = 960 + Math.cos(a) * R * 1.25, fy = 540 + Math.sin(a) * R * 0.86;
+      if ((fx < 360 && fy < 400) || (fx < 640 && fy > 900) || (fx > 1560 && fy < 180) || (fx > 1680 && fy > 940)) return;   // keep the corner text clear
+      for (var t = 2; t >= 0; t--) {
+        var rr = R - t * 34, x = 960 + Math.cos(a) * rr * 1.25, y = 540 + Math.sin(a) * rr * 0.86, op = t === 0 ? 1 : 0.22 / t;
+        svg += '<g transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + (i * 37 + t * 8) + ')" opacity="' + op + '">' + shape(s[2], size, col) + '</g>';
+      }
+    });
+    return new DOMParser().parseFromString(svg + '</svg>', 'image/svg+xml').documentElement;
+  }
+  function shape(kind, s, col) {
+    if (kind === 'ring') return '<circle r="' + (s * 0.4) + '" fill="none" stroke="' + col + '" stroke-width="' + (s * 0.3) + '"/>';
+    if (kind === 'cross') { var a = s * 0.36; return '<rect x="' + (-a / 2) + '" y="' + (-s / 2) + '" width="' + a + '" height="' + s + '" rx="' + (a * .28) + '" fill="' + col + '"/><rect x="' + (-s / 2) + '" y="' + (-a / 2) + '" width="' + s + '" height="' + a + '" rx="' + (a * .28) + '" fill="' + col + '"/>'; }
+    if (kind === 'pills') { var h = s * 0.22, o = ''; for (var i = 0; i < 3; i++) o += '<rect x="' + (-s / 2 + i * h * .6) + '" y="' + (-s / 2 + i * h * 1.3) + '" width="' + s + '" height="' + h + '" rx="' + h / 2 + '" fill="' + col + '"/>'; return o; }
+    if (kind === 'half') return '<path d="M ' + (-s / 2) + ' 0 A ' + s / 2 + ' ' + s / 2 + ' 0 0 1 ' + s / 2 + ' 0 Z" fill="' + col + '"/>';
+    var d = '', n = 90;
+    for (var j = 0; j <= n; j++) { var t = j / n * Math.PI * 2, r = s / 2 + Math.sin(t * 9) * s * 0.045; d += (j ? 'L' : 'M') + (Math.cos(t) * r).toFixed(1) + ' ' + (Math.sin(t) * r).toFixed(1); }
+    return '<path d="' + d + 'Z" fill="' + col + '"/>';
+  }
+})();
+</script>
+</body>
+</html>
