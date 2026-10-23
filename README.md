@@ -121,6 +121,64 @@ To pause the takeover, create an empty file `server/.home_watch_off`. Delete it 
 | Voice search from your phone | Run `mkdir -p server/keys/https && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=channel-0 -keyout server/keys/https/key.pem -out server/keys/https/cert.pem`, then restart the server. The voice page runs on port 8766. |
 | Preview a design on your computer | `http://localhost:8765/<design>.html` |
 
+## Make it permanent with a Google TV box
+
+On VIDAA, Channel 0 is a takeover: your computer has to stay on, and VIDAA can flash up for a moment before the launcher opens. VIDAA's firmware is locked, so that can't be fixed on the TV itself.
+
+The permanent route is a Google TV / Android TV box plugged into the TV. Android lets you set your own app as the home screen, with no computer and no takeover, and you never see VIDAA.
+
+> **Status:** the Android TV version of Channel 0 is in progress. The steps below get your box ready, and the native app will install the same way.
+
+### Which box
+
+| Box | RAM | Notes |
+|---|---|---|
+| **Google TV Streamer** | 4 GB | Smoothest. Runs every design, including the WebGL ones. Ethernet built in. |
+| **Xiaomi TV Box S (3rd Gen)** | 2 GB | Best value. Great for the lighter designs. |
+| **Nvidia Shield TV Pro** | 3 GB | Most open, but expensive. |
+
+Avoid Amazon Fire TV (it blocks custom home screens) and unbranded "8 GB" boxes (fake specs, no Netflix HD).
+
+### Never see VIDAA again
+
+1. On the TV, turn on **HDMI-CEC** (in VIDAA's settings under Inputs or Device control).
+2. Use the box's remote. Power on turns the TV on and switches straight to the box, and the volume buttons control the TV.
+
+### Get the box ready
+
+1. **Settings → System → About** → press OK on **Android TV OS build** 7 times to turn on developer mode.
+2. **Settings → System → Developer options** → turn on **USB debugging** (and **Wireless debugging** if it's listed).
+3. Note the box's IP under **Settings → Network**, then from your computer (with Android [platform-tools](https://developer.android.com/tools/releases/platform-tools)):
+
+```sh
+adb connect <box-ip>:5555        # approve the prompt on the TV
+adb install channel-0.apk        # once the Android build is out
+```
+
+4. Make Channel 0 the home screen by turning off Google's own:
+
+```sh
+adb shell pm disable-user --user 0 com.google.android.apps.tv.launcherx
+```
+
+Press Home and Channel 0 opens. To undo it at any time:
+
+```sh
+adb shell pm enable com.google.android.apps.tv.launcherx
+```
+
+A big Google TV update can sometimes turn the stock home screen back on. If that happens, run the disable command again.
+
+### What you get on a box
+
+- Your home screen as the real default, which stays put after restarts
+- Your own Settings screen for themes, app order, hidden apps, sleep timer and PIN lock
+- A custom screensaver
+- Real Netflix, YouTube, Prime and any Android TV app
+- Remote buttons you can remap
+
+Wi-Fi setup, Bluetooth pairing, system updates and the Google account still use Google's own screens.
+
 ## Repo layout
 
 ```
